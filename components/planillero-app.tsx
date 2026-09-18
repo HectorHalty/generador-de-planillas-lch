@@ -378,6 +378,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                     : "Estoy armando el PDF nuevo. No cierres esta pestaña."}
                 </p>
               ) : null}
+              {error ? (
                 <Alert variant="destructive">
                   <AlertTriangle />
                   <AlertTitle>No se pudo armar el documento</AlertTitle>
