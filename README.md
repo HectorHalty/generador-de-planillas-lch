@@ -98,28 +98,4 @@ npm install
 npm run dev
 ```
 
-### Ejecutable de Windows (desde GitHub)
 
-En un repo de GitHub, **Actions → Build Windows executable → Run workflow**. Baja `GeneradorPlanillasLCH.exe`. En una etiqueta `v1.0.0` también queda adjunto al Release.
-
-En tu máquina, con PyInstaller:
-
-```bash
-python3 -m pip install -r requirements.txt pyinstaller
-pyinstaller --noconfirm --clean packaging/generador.spec
-```
-
-## Publicar el repositorio público
-
-Este proyecto está pensado para un repo público llamado **generador-de-planillas-lch**.
-
-En Cursor, usá el botón **Create repo**, poné el nombre `generador-de-planillas-lch` y marcá **Public**. Después:
-
-```bash
-git remote add github https://github.com/TU_USUARIO/generador-de-planillas-lch.git
-git push -u github main
-```
-
-## Licencia
-
-MIT. Uso interno de mesa de control de La Chacra Fútbol.
