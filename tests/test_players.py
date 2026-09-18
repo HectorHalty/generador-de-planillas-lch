@@ -50,9 +50,10 @@ def test_highlights_found_player_and_warns_missing():
     assert "No encuentro a Ezequiel Guzman" in (by_name["Ezequiel Guzman"].warning or "")
     assert by_name["Nadie"].found is False
     assert "planilla de Equipo Inventado" in (by_name["Nadie"].warning or "")
-    annots = list(document[0].annots() or [])
-    assert annots
-    assert annots[0].type[1] == "Highlight"
+    page = document[0]
+    annot = page.first_annot
+    assert annot is not None
+    assert "Highlight" in str(annot)
     document.close()
 
 
@@ -75,9 +76,10 @@ Cancha 1
     assert marks["Ezequiel Guzman"]["found"] is False
     assert any("Ezequiel Guzman" in warning for warning in summary["warnings"])
     output = fitz.open(stream=pdf_out, filetype="pdf")
-    annots = list(output[0].annots() or [])
-    assert annots
-    assert annots[0].type[1] == "Highlight"
+    page = output[0]
+    annot = page.first_annot
+    assert annot is not None
+    assert "Highlight" in str(annot)
     output.close()
 
 
@@ -115,6 +117,5 @@ def test_real_masivo_player_marks_if_present():
     assert "No encuentro a Ezequiel Guzman" in (marks["Ezequiel Guzman"]["warning"] or "")
     output = fitz.open(stream=pdf_out, filetype="pdf")
     page_index = (marks["Agustin Ferreyra"]["page"] or 1) - 1
-    annots = list(output[page_index].annots() or [])
-    assert annots
+    assert output[page_index].first_annot is not None
     output.close()
