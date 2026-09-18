@@ -20,8 +20,10 @@ def test_home_renders_brand():
     assert "Generador de Planillas LCH" in response.text
     assert "Día de la jornada" in response.text
     assert "Descargar PDF" in response.text
-    assert "Jugadores a marcar" in response.text
+    assert "Suspendidos" in response.text
+    assert 'name="players"' in response.text
     assert "Ezequiel Guzman (Mimetizarte)" in response.text
+    assert "Jugadores a marcar" not in response.text
     assert "Completar faltantes" not in response.text
     assert "Ejemplo de prueba" not in response.text
     assert "Descargar ejemplo" not in response.text

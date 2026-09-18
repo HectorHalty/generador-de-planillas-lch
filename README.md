@@ -9,7 +9,7 @@ A partir del PDF masivo y el horario por cancha:
 1. Completa **Día** (el sábado próximo), **Horario** y **Cancha N°**.
 2. Conserva las hojas de los equipos que **sí juegan**.
 3. Saca los que no están en el horario.
-4. Si agregás un jugador con su equipo, pinta su fila de **celeste clarito** en la planilla de ese club.
+4. Si pegás una lista de **suspendidos** (`Nombre Apellido (Equipo)`, uno por línea), pinta su fila de **celeste clarito** en la planilla de su club.
 
 El horario de la jornada actual ya viene cargado, y el masivo también si está en `public/planillas-masivo.pdf`.
 
@@ -55,7 +55,7 @@ El masivo de la jornada puede ir ya en `public/planillas-masivo.pdf`. Si querés
 ## Opciones
 
 - **Día de la jornada**: por defecto el sábado próximo (Argentina).
-- **Jugadores a marcar**: un nombre con su equipo, por ejemplo `Ezequiel Guzman (Mimetizarte)`. La fila de ese jugador en la planilla de su club queda en celeste clarito. Si no está en la hoja, la app avisa.
+- **Suspendidos**: pegá uno por línea, igual que el horario, por ejemplo `Ezequiel Guzman (Mimetizarte)`. La fila de ese jugador en la planilla de su club queda en celeste clarito. Si no está en la hoja, la app avisa.
 - **Hombres, después mujeres** o **solo cancha y hora**.
 
 ## Formato del horario
@@ -74,6 +74,16 @@ Cancha 1
 ```
 
 También acepta markdown (`**Hombres:**`, `*Cancha 1*`).
+
+## Formato de suspendidos
+
+```text
+Ezequiel Guzman (Mimetizarte)
+Agustin Ferreyra (Mimetizarte)
+Bruno Lemma (Mimetizarte)
+```
+
+También acepta viñetas (`*`, `-`) y un título `Suspendidos:`.
 
 ## Desarrollo
 

@@ -10,6 +10,11 @@ from processor.assign import extract_club
 from processor.names import names_equivalent, normalize_name
 
 PLAYER_LINE = re.compile(r"^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$")
+LIST_PREFIX = re.compile(r"^[\-\*\u2022\u00b7\#]+\s*")
+HEADER_LINE = re.compile(
+    r"^(suspendidos?|jugadores?|lista|sancionados?)\s*:?\s*$",
+    re.IGNORECASE,
+)
 HEADER_LABELS = {"nombre del jugador", "nombre", "dni", "fecha nac", "dorsal", "firma"}
 CELESTE = (0.62, 0.90, 0.98)
 TABLE_LEFT = 37.5
@@ -43,8 +48,10 @@ def parse_player_marks(text: str) -> tuple[list[MarkedPlayer], list[str]]:
     errors: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, raw in enumerate((text or "").splitlines(), start=1):
-        line = raw.strip()
+        line = LIST_PREFIX.sub("", (raw or "").strip()).strip()
         if not line:
+            continue
+        if HEADER_LINE.match(line) or (line.endswith(":") and "(" not in line):
             continue
         hit = PLAYER_LINE.match(line)
         if not hit:

@@ -71,6 +71,7 @@
         border-radius: 0.7rem; padding: 0.7rem; font-family: ui-monospace, monospace;
         font-size: 0.78rem; line-height: 1.45; background: #fff;
       }
+      #players { min-height: 10rem; }
       input[type="text"] {
         border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.5rem 0.7rem;
         background: #fff; min-height: 2.6rem;
@@ -110,7 +111,7 @@
       <div class="wrap">
         <p class="kicker">La Chacra Fútbol</p>
         <h1>Generador de Planillas LCH</h1>
-        <p>El masivo ya está cargado. Completa día, cancha y hora, tira los equipos que no juegan, y podés marcar jugadores en celeste en la planilla de su equipo.</p>
+        <p>El masivo ya está cargado. Completa día, cancha y hora, tira los equipos que no juegan, y podés pegar los suspendidos para marcarlos en celeste en la planilla de su equipo.</p>
         <div class="stats">
           <div class="stat"><span>Partidos</span><strong id="stat-matches">—</strong></div>
           <div class="stat"><span>Equipos</span><strong id="stat-teams">—</strong></div>
@@ -158,24 +159,13 @@
             </div>
           </section>
           <section class="card" style="margin-top:1rem">
-            <h2>3. Jugadores a marcar</h2>
-            <p class="hint">Agregá el nombre y el equipo, por ejemplo <strong>Ezequiel Guzman (Mimetizarte)</strong>. En la planilla de ese club se pinta la fila de celeste clarito. Si no está, te aviso.</p>
+            <h2>3. Suspendidos</h2>
+            <p class="hint">Pegá la lista, un jugador por línea, igual que el horario. Formato: <code>Nombre Apellido (Equipo)</code>.</p>
+            <textarea name="players" id="players" aria-label="Lista de suspendidos" placeholder="Ezequiel Guzman (Mimetizarte)&#10;Agustin Ferreyra (Mimetizarte)"></textarea>
             <div class="row">
-              <label class="field">
-                <span>Nombre</span>
-                <input type="text" id="player-name" placeholder="Ezequiel Guzman" autocomplete="off" />
-              </label>
-              <label class="field">
-                <span>Equipo</span>
-                <input type="text" id="player-team" placeholder="Mimetizarte" autocomplete="off" />
-              </label>
-              <button type="button" id="add-player" class="primary">Agregar</button>
+              <button type="button" id="clear-players">Vaciar lista</button>
+              <span class="hint" id="player-status">Todavía no hay suspendidos.</span>
             </div>
-            <p class="hint" style="margin-top:0.6rem">También podés pegar todo junto en Nombre: <code>Ezequiel Guzman (Mimetizarte)</code>.</p>
-            <p id="player-error" class="alert bad" hidden></p>
-            <ul class="players" id="player-list"></ul>
-            <p class="hint empty-players" id="player-empty">Todavía no hay jugadores marcados.</p>
-            <textarea name="players" id="players" hidden></textarea>
           </section>
           <section class="card" style="margin-top:1rem">
             <h2>4. Cómo armar el PDF</h2>
@@ -211,14 +201,9 @@
       const scheduleEl = document.getElementById("schedule");
       const sourceEl = document.getElementById("source");
       const fileEl = document.getElementById("pdf-file");
-      const playerNameEl = document.getElementById("player-name");
-      const playerTeamEl = document.getElementById("player-team");
-      const playerListEl = document.getElementById("player-list");
-      const playersField = document.getElementById("players");
-      const playerError = document.getElementById("player-error");
-      const playerEmpty = document.getElementById("player-empty");
+      const playersEl = document.getElementById("players");
+      const playerStatus = document.getElementById("player-status");
       const playerLine = /^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$/;
-      const markedPlayers = [];
 
       function parseSchedule(text) {
         const matches = [];
@@ -266,53 +251,44 @@
           el.innerHTML = "<div class='time'>" + match.time + "</div><div>" + match.home + " vs " + match.away + "</div>";
           box.appendChild(el);
         });
+        renderPlayers();
+      }
+
+      function parsePlayers(text) {
+        const players = [];
+        const errors = [];
+        const seen = new Set();
+        text.split(/\r?\n/).forEach((raw, i) => {
+          let line = raw.trim().replace(/^[-*•·#]+\s*/, "");
+          if (!line) return;
+          if (/^(suspendidos?|jugadores?|lista|sancionados?)\s*:?\s*$/i.test(line)) return;
+          if (line.endsWith(":") && line.indexOf("(") < 0) return;
+          const hit = playerLine.exec(line);
+          if (!hit) {
+            errors.push("Línea " + (i + 1) + ": usá Nombre Apellido (Equipo), por ejemplo Ezequiel Guzman (Mimetizarte).");
+            return;
+          }
+          const name = hit[1].replace(/\s+/g, " ").replace(/^[\s-]+|[\s-]+$/g, "");
+          const team = hit[2].replace(/\s+/g, " ").replace(/^[\s-]+|[\s-]+$/g, "");
+          if (name.length < 3 || team.length < 2) {
+            errors.push("Línea " + (i + 1) + ": faltan el nombre o el equipo.");
+            return;
+          }
+          const key = name.toLowerCase() + "|" + team.toLowerCase();
+          if (seen.has(key)) return;
+          seen.add(key);
+          players.push({ name, team, raw: name + " (" + team + ")" });
+        });
+        return { players, errors };
       }
 
       function renderPlayers() {
-        playersField.value = markedPlayers.map((item) => item.raw).join("\n");
-        playerListEl.innerHTML = "";
-        playerEmpty.hidden = markedPlayers.length > 0;
-        markedPlayers.forEach((item, index) => {
-          const li = document.createElement("li");
-          li.appendChild(document.createTextNode(item.raw));
-          const remove = document.createElement("button");
-          remove.type = "button";
-          remove.textContent = "Quitar";
-          remove.addEventListener("click", () => {
-            markedPlayers.splice(index, 1);
-            renderPlayers();
-          });
-          li.appendChild(remove);
-          playerListEl.appendChild(li);
-        });
-      }
-
-      function addPlayer() {
-        playerError.hidden = true;
-        let name = playerNameEl.value.trim();
-        let team = playerTeamEl.value.trim();
-        const combined = playerLine.exec(name);
-        if (combined) {
-          name = combined[1].trim();
-          team = team || combined[2].trim();
-        }
-        if (name.length < 3 || team.length < 2) {
-          playerError.hidden = false;
-          playerError.textContent = "Escribí el nombre y el equipo, por ejemplo Ezequiel Guzman (Mimetizarte).";
+        const parsed = parsePlayers(playersEl.value);
+        if (!playersEl.value.trim()) {
+          playerStatus.textContent = "Todavía no hay suspendidos.";
           return;
         }
-        const raw = name + " (" + team + ")";
-        const key = raw.toLowerCase();
-        if (markedPlayers.some((item) => item.raw.toLowerCase() === key)) {
-          playerError.hidden = false;
-          playerError.textContent = "Ese jugador ya está en la lista.";
-          return;
-        }
-        markedPlayers.push({ name, team, raw });
-        playerNameEl.value = "";
-        playerTeamEl.value = "";
-        playerNameEl.focus();
-        renderPlayers();
+        playerStatus.textContent = parsed.errors[0] || (parsed.players.length + " suspendido" + (parsed.players.length === 1 ? "" : "s") + " listo" + (parsed.players.length === 1 ? "" : "s"));
       }
 
       function setSource(source, file) {
@@ -335,13 +311,8 @@
       });
       document.getElementById("use-masivo").onclick = () => setSource("masivo");
       document.getElementById("restore").onclick = () => { scheduleEl.value = defaultSchedule; render(); };
-      document.getElementById("add-player").onclick = addPlayer;
-      playerNameEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); addPlayer(); }
-      });
-      playerTeamEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); addPlayer(); }
-      });
+      document.getElementById("clear-players").onclick = () => { playersEl.value = ""; renderPlayers(); };
+      playersEl.addEventListener("input", renderPlayers);
       document.getElementById("sort-cat").onclick = () => {
         document.getElementById("sort").value = "category";
         document.getElementById("sort-cat").classList.add("primary");

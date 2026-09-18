@@ -35,6 +35,23 @@ def test_parse_player_marks_format():
     assert any("nombre o el equipo" in error for error in errors)
 
 
+def test_parse_player_marks_accepts_pasted_list():
+    players, errors = parse_player_marks(
+        """
+        Suspendidos:
+        * Ezequiel Guzman (Mimetizarte)
+        - Agustin Ferreyra (Mimetizarte)
+        • Bruno Lemma (Mimetizarte)
+        """
+    )
+    assert errors == []
+    assert [item.name for item in players] == [
+        "Ezequiel Guzman",
+        "Agustin Ferreyra",
+        "Bruno Lemma",
+    ]
+
+
 def test_highlights_found_player_and_warns_missing():
     pdf = _roster_pdf("Mimetizarte", ["Agustín Ferreyra", "Bruno Lemma"])
     players, errors = parse_player_marks(

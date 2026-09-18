@@ -12,18 +12,16 @@ import {
   MapPinned,
   Trash2,
   Upload,
-  UserPlus,
   Users,
-  X,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { MatchInfo, PlayerMark, ProcessSummary, SchedulePayload } from "@/lib/types";
+import { parsePlayers } from "@/lib/parse-players";
 import { parseSchedule } from "@/lib/parse-schedule";
 import { formatSheetDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -41,10 +39,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [sortMode, setSortMode] = useState<"category" | "court">("category");
   const [matchDate, setMatchDate] = useState(defaultMatchDate);
-  const [playerName, setPlayerName] = useState("");
-  const [playerTeam, setPlayerTeam] = useState("");
-  const [playerError, setPlayerError] = useState<string | null>(null);
-  const [players, setPlayers] = useState<string[]>([]);
+  const [playersText, setPlayersText] = useState("");
   const [parsed, setParsed] = useState<SchedulePayload>(() => parseSchedule(defaultSchedule));
   const [parseError, setParseError] = useState<string | null>(
     () => parseSchedule(defaultSchedule).errors[0] ?? null,
@@ -67,6 +62,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
   }, [downloadUrl]);
 
   const grouped = useMemo(() => groupMatches(parsed.matches), [parsed]);
+  const parsedPlayers = useMemo(() => parsePlayers(playersText), [playersText]);
   const sourceLabel =
     file?.name ??
     (source === "masivo" ? "Planillas de Cancha - Masivo.pdf" : "Sin documento");
@@ -79,29 +75,6 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
     if (!next && inputRef.current) inputRef.current.value = "";
     if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
-  }
-
-  function addPlayer() {
-    let name = playerName.trim();
-    let team = playerTeam.trim();
-    const combined = /^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$/.exec(name);
-    if (combined) {
-      name = combined[1].trim();
-      team = team || combined[2].trim();
-    }
-    if (name.length < 3 || team.length < 2) {
-      setPlayerError("Escribí el nombre y el equipo, por ejemplo Ezequiel Guzman (Mimetizarte).");
-      return;
-    }
-    const raw = `${name} (${team})`;
-    if (players.some((item) => item.toLowerCase() === raw.toLowerCase())) {
-      setPlayerError("Ese jugador ya está en la lista.");
-      return;
-    }
-    setPlayers((current) => [...current, raw]);
-    setPlayerName("");
-    setPlayerTeam("");
-    setPlayerError(null);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -123,7 +96,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       form.set("source", file ? "upload" : source);
       form.set("sort", sortMode);
       form.set("date", matchDate);
-      form.set("players", players.join("\n"));
+      form.set("players", playersText);
       if (file) form.set("pdf", file);
 
       if (kind === "analyze") {
@@ -176,7 +149,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
             <p className="max-w-xl text-sm text-primary-foreground/80">
               El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
               El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada.
-              Podés marcar jugadores en celeste en la planilla de su equipo.
+              Pegá los suspendidos para marcarlos en celeste en la planilla de su equipo.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -199,7 +172,6 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       >
         <input type="hidden" name="source" value={file ? "upload" : source} />
         <input type="hidden" name="sort" value={sortMode} />
-        <input type="hidden" name="players" value={players.join("\n")} />
 
         <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2">
@@ -378,79 +350,35 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
 
             <Card>
               <CardHeader>
-                <CardTitle>3. Jugadores a marcar</CardTitle>
+                <CardTitle>3. Suspendidos</CardTitle>
                 <CardDescription>
-                  Agregá el nombre y el equipo, por ejemplo{" "}
-                  <span className="font-medium">Ezequiel Guzman (Mimetizarte)</span>. En la
-                  planilla de ese club se pinta la fila de celeste clarito. Si no está, te aviso.
+                  Pegá la lista, un jugador por línea, igual que el horario. Formato:{" "}
+                  <span className="font-mono">Nombre Apellido (Equipo)</span>.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <label className="flex-1 space-y-1 text-sm">
-                    <span className="text-muted-foreground">Nombre</span>
-                    <Input
-                      value={playerName}
-                      onChange={(event) => setPlayerName(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addPlayer();
-                        }
-                      }}
-                      placeholder="Ezequiel Guzman"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="flex-1 space-y-1 text-sm">
-                    <span className="text-muted-foreground">Equipo</span>
-                    <Input
-                      value={playerTeam}
-                      onChange={(event) => setPlayerTeam(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addPlayer();
-                        }
-                      }}
-                      placeholder="Mimetizarte"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <Button type="button" onClick={addPlayer}>
-                    <UserPlus data-icon="inline-start" />
-                    Agregar
+                <Textarea
+                  name="players"
+                  value={playersText}
+                  onChange={(event) => setPlayersText(event.target.value)}
+                  className="field-sizing-fixed h-40 resize-y overflow-auto font-mono text-xs leading-5"
+                  aria-label="Lista de suspendidos"
+                  placeholder={"Ezequiel Guzman (Mimetizarte)\nAgustin Ferreyra (Mimetizarte)"}
+                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPlayersText("")}>
+                    Vaciar lista
                   </Button>
+                  {parsedPlayers.errors[0] ? (
+                    <p className="text-destructive text-sm">{parsedPlayers.errors[0]}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      {parsedPlayers.players.length
+                        ? `${parsedPlayers.players.length} suspendido${parsedPlayers.players.length === 1 ? "" : "s"} listo${parsedPlayers.players.length === 1 ? "" : "s"}`
+                        : "Todavía no hay suspendidos."}
+                    </p>
+                  )}
                 </div>
-                <p className="text-muted-foreground text-sm">
-                  También podés pegar todo junto en Nombre:{" "}
-                  <span className="font-mono">Ezequiel Guzman (Mimetizarte)</span>.
-                </p>
-                {playerError ? <p className="text-destructive text-sm">{playerError}</p> : null}
-                {players.length ? (
-                  <ul className="flex flex-wrap gap-2">
-                    {players.map((item) => (
-                      <li
-                        key={item}
-                        className="inline-flex items-center gap-1 rounded-full bg-[#c8eaf6] px-3 py-1 text-sm text-[#1d4f63]"
-                      >
-                        {item}
-                        <button
-                          type="button"
-                          className="rounded-full p-0.5 hover:bg-white/60"
-                          onClick={() =>
-                            setPlayers((current) => current.filter((player) => player !== item))
-                          }
-                          aria-label={`Quitar ${item}`}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Todavía no hay jugadores marcados.</p>
-                )}
               </CardContent>
             </Card>
 
