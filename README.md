@@ -5,8 +5,8 @@ App para armar las **planillas de cancha** de una jornada a partir de un PDF mas
 Hace tres cosas:
 
 1. Lee el horario (Hombres/Mujeres, cancha, hora, local vs visitante).
-2. Conserva del PDF original las hojas cuyos equipos **sí están** en esa lista, y les completa cancha y hora.
-3. **Elimina** equipos que no juegan, ordena el documento por cancha y horario, y genera planillas nuevas si un partido no estaba en el PDF.
+2. Conserva del PDF original las hojas cuyos equipos **sí están** en esa lista, y les completa día, cancha y hora.
+3. **Elimina** equipos que no juegan, ordena el documento por cancha y horario, y genera planillas nuevas si un partido no estaba en el PDF. No agrega las hojas de cruces ni la franja de margen.
 
 El horario de la jornada actual ya viene cargado. Si tu PDF original no está a mano, podés probar con la planilla de ejemplo (incluye 3 partidos de más para ver el recorte).
 
@@ -34,11 +34,12 @@ El masivo de esta jornada ya viene precargado en la app. Si lo querés cargar vo
 
 **Previsualizar** muestra qué equipos se tiran, sin generar el PDF todavía.
 
-Cada hoja del masivo es la planilla de un club. Planillero completa **Horario** y **Cancha N°**, ordena local y visitante según la jornada, y saca los equipos que no juegan (y la hoja extra de firmas, si la tenían).
+Cada hoja del masivo es la planilla de un club. Planillero completa **Día** (el sábado próximo), **Horario** y **Cancha N°**, ordena local y visitante según la jornada, y saca los equipos que no juegan (y la hoja extra de firmas, si la tenían). El PDF arranca en las planillas: no incluye las dos hojas de cruces ni la franja de margen.
 
 Opciones:
 
-- **Hoja índice**: resumen al frente, agrupado por cancha.
+- **Día de la jornada**: por defecto el sábado próximo (en Argentina).
+- **Hojas de cruces al frente**: apagado. Si lo marcás, agrega el índice de partidos.
 - **Completar faltantes**: crea una planilla en blanco si el partido no estaba en el original.
 - **Hombres, después mujeres** o **solo cancha y hora**.
 

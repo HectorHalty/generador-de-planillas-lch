@@ -42,6 +42,7 @@ export function renderAnalyzePage(
     sort: string;
     index: string;
     blanks: string;
+    date: string;
   },
 ) {
   const removed = summary.removedTeams ?? [];
@@ -91,6 +92,7 @@ export function renderAnalyzePage(
           <input type="hidden" name="sort" value="${escapeAttribute(fields.sort)}" />
           <input type="hidden" name="index" value="${escapeAttribute(fields.index)}" />
           <input type="hidden" name="blanks" value="${escapeAttribute(fields.blanks)}" />
+          <input type="hidden" name="date" value="${escapeAttribute(fields.date)}" />
           <div class="actions">
             <button class="btn primary" type="submit">Armar planillas</button>
             <a class="btn" href="/">Volver a editar</a>

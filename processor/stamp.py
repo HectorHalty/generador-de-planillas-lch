@@ -5,14 +5,25 @@ import pymupdf as fitz
 from processor import fonts
 from processor.schedule import Match
 
-GREEN = (0.09, 0.22, 0.16)
-WINE = (0.45, 0.18, 0.22)
 INK = (0.08, 0.09, 0.08)
 WHITE = (1, 1, 1)
 
 
-def stamp_page(page: fitz.Page, match: Match) -> None:
+def stamp_page(page: fitz.Page, match: Match, day: str | None = None) -> None:
+    write_day_at = None
+    if day:
+        write_day_at = _redact_day_blank(page)
+        if write_day_at is not None:
+            page.apply_redactions()
     fontname = _fontname(page)
+    if day and write_day_at is not None:
+        page.insert_text(
+            write_day_at,
+            f"Día: {day}",
+            fontname=fontname,
+            fontsize=10,
+            color=INK,
+        )
     for rect, value in _value_ops(
         page,
         ["Cancha N°:", "Cancha N:", "Cancha N", "Cancha:", "CANCHA:"],
@@ -26,17 +37,28 @@ def stamp_page(page: fitz.Page, match: Match) -> None:
     ):
         _paint_value(page, rect, value, fontname)
 
-    color = GREEN if match.category == "Hombres" else WINE
-    footer = fitz.Rect(0, page.rect.height - 26, page.rect.width, page.rect.height)
-    page.draw_rect(footer, color=color, fill=color, width=0)
-    page.insert_textbox(
-        fitz.Rect(16, page.rect.height - 22, page.rect.width - 16, page.rect.height - 4),
-        f"Cancha {match.court}   ·   {match.time}   ·   {match.category}   ·   {match.home} vs {match.away}",
-        fontname=fontname,
-        fontsize=9,
-        color=WHITE,
-        align=1,
+
+def _redact_day_blank(page: fitz.Page) -> tuple[float, float] | None:
+    hits: list[fitz.Rect] = []
+    for label in ("Día:", "Dia:", "DÍA:", "DIA:"):
+        hits.extend(page.search_for(label))
+    if not hits:
+        return None
+    label_rect = sorted(hits, key=lambda item: (item.y0, item.x0))[0]
+    horario_hits = [
+        rect
+        for needle in ("Horario:", "Horario")
+        for rect in page.search_for(needle)
+        if abs(rect.y0 - label_rect.y0) <= 8
+    ]
+    x1 = (
+        min(rect.x0 for rect in horario_hits) - 6
+        if horario_hits
+        else min(label_rect.x1 + 110, page.rect.width - 8)
     )
+    cover = fitz.Rect(label_rect.x0 - 1, label_rect.y0 - 1, x1, label_rect.y1 + 1)
+    page.add_redact_annot(cover, fill=WHITE)
+    return (label_rect.x0, label_rect.y1 - 3)
 
 
 def _paint_value(page: fitz.Page, rect: fitz.Rect, value: str, fontname: str) -> None:

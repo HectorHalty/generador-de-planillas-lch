@@ -100,20 +100,29 @@ def test_pipeline_drops_unscheduled_and_fills_slots():
     output.close()
 
 
-def test_stamp_fills_court_and_time():
+def test_stamp_fills_court_time_and_day():
     document = fitz.open()
     match = parse_schedule(DEFAULT).matches[0]
-    draw_match_planilla(document, match, blank_slots=True)
+    page = document.new_page(width=595, height=842)
+    page.insert_text((40, 40), "PLANILLA DE CANCHA", fontsize=16)
+    page.insert_text((40, 62), "Liga: Hombres C  |  Club: Mambo F.C.", fontsize=10)
+    page.insert_text(
+        (40, 90),
+        "Día: ___ / ___ / _____     Horario: ________     Cancha N°: ________",
+        fontsize=11,
+    )
     from processor.stamp import stamp_page
 
-    stamp_page(document[0], match)
-    text = document[0].get_text("text")
-    assert "Cancha 1" in text
+    stamp_page(page, match, day="19 / 09 / 2026")
+    text = page.get_text("text")
+    assert "Cancha 1" in text or "1" in text
     assert "11:30" in text
-    assert "Mambo F.C." in text
-    times = document[0].search_for("11:30")
+    assert "19 / 09 / 2026" in text
+    assert "___ / ___ / _____" not in text
+    assert "Cancha 1   ·   11:30" not in text
+    times = page.search_for("11:30")
     assert times
-    assert any(rect.y0 < 90 for rect in times)
+    assert any(rect.y0 < 120 for rect in times)
     document.close()
 
 

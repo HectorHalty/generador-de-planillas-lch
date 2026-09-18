@@ -20,7 +20,21 @@ def main(argv: list[str] | None = None) -> int:
     _add_io_args(generate)
     generate.add_argument("--out", required=True)
     generate.add_argument("--sort", choices=("category", "court"), default="category")
-    generate.add_argument("--no-index", action="store_true")
+    generate.add_argument("--date", help="Fecha de la jornada (YYYY-MM-DD). Por defecto, el sábado próximo.")
+    index_group = generate.add_mutually_exclusive_group()
+    index_group.add_argument(
+        "--index",
+        dest="include_index",
+        action="store_true",
+        help="Agregar las hojas de cruces al frente.",
+    )
+    index_group.add_argument(
+        "--no-index",
+        dest="include_index",
+        action="store_false",
+        help="No incluir las hojas de cruces (predeterminado).",
+    )
+    generate.set_defaults(include_index=False)
     generate.add_argument("--no-blanks", action="store_true")
 
     sample = sub.add_parser("sample")
@@ -52,10 +66,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(analyze_document(pdf_bytes, schedule), ensure_ascii=False))
         return 0
 
+    from processor.dates import parse_iso_date
+
     options = ProcessOptions(
         sort_mode=args.sort,
-        include_index=not args.no_index,
+        include_index=args.include_index,
         create_missing=not args.no_blanks,
+        match_date=parse_iso_date(args.date),
     )
     pdf_out, summary = generate_document(pdf_bytes, schedule, options)
     Path(args.out).write_bytes(pdf_out)

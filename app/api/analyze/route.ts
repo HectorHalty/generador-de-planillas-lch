@@ -15,14 +15,15 @@ export async function POST(request: Request) {
     const schedule = String(form.get("schedule") ?? "");
     const source = String(form.get("source") ?? (form.get("sample") === "1" ? "ejemplo" : "masivo"));
     const sort = String(form.get("sort") ?? "category");
-    const index = String(form.get("index") ?? "1");
+    const index = String(form.get("index") ?? "0");
     const blanks = String(form.get("blanks") ?? "1");
+    const date = String(form.get("date") ?? "");
     const file = form.get("pdf");
     const pdf = await resolveUploadedPdf(file, source, schedule);
     const payload = (await analyzePdf(pdf, schedule)) as ProcessSummary;
     if (html) {
       return htmlResponse(
-        renderAnalyzePage(payload, { schedule, source, sort, index, blanks }),
+        renderAnalyzePage(payload, { schedule, source, sort, index, blanks, date }),
       );
     }
     return NextResponse.json(payload);

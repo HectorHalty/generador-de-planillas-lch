@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from datetime import date
+
 import pymupdf as fitz
 
 from processor.assign import extract_club
@@ -15,7 +17,7 @@ def _club_page(doc: fitz.Document, club: str, extra_players: bool = False) -> No
         f"Liga: Hombres C  |  Temporada: Clausura 2026  |  Club: {club}",
         fontsize=10,
     )
-    page.insert_text((40, 90), "Horario: ________     Cancha N°: ________", fontsize=11)
+    page.insert_text((40, 90), "Día: ___ / ___ / _____     Horario: ________     Cancha N°: ________", fontsize=11)
     page.insert_text((40, 120), "1  Jugador Uno", fontsize=10)
     if extra_players:
         page = doc.new_page(width=595, height=842)
@@ -50,7 +52,11 @@ def test_club_sheets_drop_extras_and_keep_continuations():
     assert kept == {1, 2, 5}
     assert 3 in dropped and 4 in dropped
 
-    pdf_out, summary = generate_document(mixed, schedule, ProcessOptions(include_index=False))
+    pdf_out, summary = generate_document(
+        mixed,
+        schedule,
+        ProcessOptions(include_index=False, match_date=date(2026, 9, 19)),
+    )
     assert summary["keptOriginalPages"] == 3
     output = fitz.open(stream=pdf_out, filetype="pdf")
     full = "\n".join(page.get_text("text") for page in output)
@@ -58,6 +64,8 @@ def test_club_sheets_drop_extras_and_keep_continuations():
     assert "Mambo F.C." in full
     assert "Echale Pesteke" in full
     assert "11:30" in full
+    assert "19 / 09 / 2026" in output[0].get_text("text")
+    assert "Cancha 1   ·   11:30" not in full
     output.close()
 
 
@@ -77,3 +85,20 @@ def test_real_masivo_if_present():
     assert not analysis["unmatchedMatches"]
     assert len(removed) == 8
     assert len(analysis["keptPages"]) >= 92
+
+    pdf_out, summary = generate_document(
+        path.read_bytes(),
+        schedule,
+        ProcessOptions(include_index=False, match_date=date(2026, 9, 19)),
+    )
+    output = fitz.open(stream=pdf_out, filetype="pdf")
+    first = output[0].get_text("text")
+    assert "Planillas de cancha" not in first
+    assert "ordenados por cancha y horario" not in first
+    assert "Club:" in first
+    assert "19 / 09 / 2026" in first
+    assert "___ / ___ / _____" not in first
+    assert "Cancha 1   ·   11:30" not in first
+    assert summary["outputPages"] == output.page_count
+    assert summary["outputPages"] == 138
+    output.close()

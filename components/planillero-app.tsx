@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  CalendarDays,
   Download,
   FileText,
   LoaderCircle,
@@ -21,21 +22,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import type { MatchInfo, ProcessSummary, SchedulePayload } from "@/lib/types";
 import { parseSchedule } from "@/lib/parse-schedule";
+import { formatSheetDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 type Props = {
   defaultSchedule: string;
+  defaultMatchDate: string;
 };
 
-export function PlanilleroApp({ defaultSchedule }: Props) {
+export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState<"masivo" | "ejemplo" | "upload">("masivo");
   const [dragOver, setDragOver] = useState(false);
   const [sortMode, setSortMode] = useState<"category" | "court">("category");
-  const [includeIndex, setIncludeIndex] = useState(true);
+  const [includeIndex, setIncludeIndex] = useState(false);
   const [createMissing, setCreateMissing] = useState(true);
+  const [matchDate, setMatchDate] = useState(defaultMatchDate);
   const [parsed, setParsed] = useState<SchedulePayload>(() => parseSchedule(defaultSchedule));
   const [parseError, setParseError] = useState<string | null>(
     () => parseSchedule(defaultSchedule).errors[0] ?? null,
@@ -98,6 +102,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
       form.set("sort", sortMode);
       form.set("index", includeIndex ? "1" : "0");
       form.set("blanks", createMissing ? "1" : "0");
+      form.set("date", matchDate);
       if (file) form.set("pdf", file);
 
       if (kind === "analyze") {
@@ -151,7 +156,8 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
             <h1 className="font-heading text-4xl leading-none sm:text-5xl">Planillero</h1>
             <p className="max-w-xl text-sm text-primary-foreground/80">
               El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
-              El documento nuevo queda ordenado, con cancha y hora, y sin equipos que no juegan.
+              El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada,
+              sin las hojas de cruces ni la franja de margen.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -368,24 +374,28 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
               <CardHeader>
                 <CardTitle>3. Cómo armar el PDF</CardTitle>
                 <CardDescription>
-                  Se conservan las hojas de equipos que sí juegan, se completa cancha y hora, y
-                  se tiran las que no están en el horario.
+                  Se conservan las hojas de equipos que sí juegan, se completa día, cancha y
+                  hora, y se tiran las que no están en el horario. No se agregan las hojas de
+                  cruces ni la franja de margen.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-start gap-2 rounded-lg border border-border p-3">
+                  <label className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                    <span className="flex items-center gap-2 font-medium">
+                      <CalendarDays className="size-4 text-primary" />
+                      Día de la jornada
+                    </span>
                     <input
-                      type="checkbox"
-                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
-                      checked={includeIndex}
-                      onChange={(event) => setIncludeIndex(event.target.checked)}
+                      type="date"
+                      name="date"
+                      value={matchDate}
+                      onChange={(event) => setMatchDate(event.target.value)}
+                      className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm"
                     />
-                    <span>
-                      <span className="block font-medium">Hoja índice</span>
-                      <span className="text-muted-foreground text-sm">
-                        Un resumen al frente, agrupado por cancha y horario.
-                      </span>
+                    <span className="text-muted-foreground text-sm">
+                      Se completa el campo Día con el sábado próximo
+                      {matchDate ? ` (${formatSheetDate(matchDate)})` : ""}.
                     </span>
                   </label>
                   <label className="flex items-start gap-2 rounded-lg border border-border p-3">
@@ -399,6 +409,21 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                       <span className="block font-medium">Completar faltantes</span>
                       <span className="text-muted-foreground text-sm">
                         Si un partido no está en el PDF, se crea una planilla en blanco.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 rounded-lg border border-border p-3 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
+                      checked={includeIndex}
+                      onChange={(event) => setIncludeIndex(event.target.checked)}
+                    />
+                    <span>
+                      <span className="block font-medium">Hojas de cruces al frente</span>
+                      <span className="text-muted-foreground text-sm">
+                        Apagado: el PDF arranca en las planillas, sin el índice de partidos ni
+                        la franja de margen.
                       </span>
                     </span>
                   </label>
@@ -594,6 +619,11 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
         <MiniStat label="Se conservan" value={summary.keptOriginalPages ?? summary.keptPages.length} />
         <MiniStat label="PDF final" value={summary.outputPages ?? "—"} />
       </div>
+      {summary.matchDate ? (
+        <p className="text-sm">
+          Día completado: <span className="font-medium">{summary.matchDate}</span>
+        </p>
+      ) : null}
       {summary.removedTeams.length ? (
         <Alert variant="destructive">
           <Trash2 />

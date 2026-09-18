@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import pymupdf as fitz
 
 from processor.assign import AssignmentResult, assign_pages
+from processor.dates import format_sheet_date, next_saturday
 from processor.planilla import draw_index_pages, draw_match_planilla
 from processor.schedule import Match, ParseResult, parse_schedule, sort_matches
 from processor.stamp import stamp_page
@@ -14,8 +16,9 @@ from processor.stamp import stamp_page
 @dataclass
 class ProcessOptions:
     sort_mode: str = "category"
-    include_index: bool = True
+    include_index: bool = False
     create_missing: bool = True
+    match_date: date | None = None
 
 
 def analyze_document(pdf_bytes: bytes, schedule_text: str) -> dict:
@@ -48,6 +51,7 @@ def generate_document(
     source = fitz.open(stream=pdf_bytes, filetype="pdf") if pdf_bytes else fitz.open()
     page_texts = [page.get_text("text") or "" for page in source]
     assignment = assign_pages(page_texts, parsed.matches)
+    day = format_sheet_date(options.match_date or next_saturday())
 
     output = fitz.open()
     if options.include_index:
@@ -60,10 +64,10 @@ def generate_document(
         if page_indexes:
             for page_index in page_indexes:
                 output.insert_pdf(source, from_page=page_index, to_page=page_index)
-                stamp_page(output[-1], match)
+                stamp_page(output[-1], match, day=day)
                 kept_original += 1
         elif options.create_missing:
-            draw_match_planilla(output, match)
+            draw_match_planilla(output, match, day=day)
             created_blank += 1
 
     source.close()
@@ -75,6 +79,7 @@ def generate_document(
     summary["outputPages"] = _page_count(pdf_out)
     summary["keptOriginalPages"] = kept_original
     summary["createdPlanillas"] = created_blank
+    summary["matchDate"] = day
     return pdf_out, summary
 
 

@@ -39,4 +39,5 @@ export type ProcessSummary = {
   outputPages?: number;
   keptOriginalPages?: number;
   createdPlanillas?: number;
+  matchDate?: string;
 };

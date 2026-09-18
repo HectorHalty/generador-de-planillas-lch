@@ -130,6 +130,7 @@ def draw_match_planilla(
     *,
     blank_slots: bool = False,
     extra_note: str | None = None,
+    day: str | None = None,
 ) -> fitz.Page:
     page = doc.new_page(width=A4.width, height=A4.height)
     regular, bold = _fontnames(page)
@@ -155,7 +156,9 @@ def draw_match_planilla(
 
     court_value = "" if blank_slots else str(match.court)
     time_value = "" if blank_slots else match.time
+    day_value = "" if blank_slots else (day or "")
     _draw_meta_box(page, 390, 14, "Categoría", match.category, regular, bold)
+    _draw_meta_box(page, 490, 14, "Día", day_value or "______", regular, bold)
     _draw_meta_box(page, 390, 48, "Cancha:", court_value or "______", regular, bold)
     _draw_meta_box(page, 490, 48, "Hora:", time_value or "______", regular, bold)
 
@@ -174,20 +177,6 @@ def draw_match_planilla(
     page.insert_text((320, y + 22), "Árbitro / fiscal", fontname=bold, fontsize=10, color=GREEN)
     page.insert_text((320, y + 48), "Nombre: ________________", fontname=regular, fontsize=11, color=INK)
     page.insert_text((40, y + 78), "Firma local: ______________     Firma visitante: ______________", fontname=regular, fontsize=9, color=MUTED)
-
-    footer = fitz.Rect(0, page.rect.height - 28, page.rect.width, page.rect.height)
-    _fill(page, footer, header_color)
-    label = f"Cancha {match.court}   ·   {match.time}   ·   {match.category}"
-    if blank_slots:
-        label = f"{match.category}   ·   {match.home} vs {match.away}"
-    _textbox(
-        page,
-        fitz.Rect(28, page.rect.height - 24, page.rect.width - 28, page.rect.height - 4),
-        label,
-        fontname=bold,
-        fontsize=10,
-        align=1,
-    )
     return page
 
 

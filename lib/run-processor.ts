@@ -85,6 +85,7 @@ export async function generatePdf(options: {
   sort: "category" | "court";
   includeIndex: boolean;
   createMissing: boolean;
+  matchDate?: string;
 }) {
   const folder = await mkdtemp(path.join(tmpdir(), "planillero-"));
   try {
@@ -104,8 +105,9 @@ export async function generatePdf(options: {
       "--sort",
       options.sort,
     ];
-    if (!options.includeIndex) args.push("--no-index");
+    if (options.includeIndex) args.push("--index");
     if (!options.createMissing) args.push("--no-blanks");
+    if (options.matchDate) args.push("--date", options.matchDate);
     const result = await runPython(args);
     if (result.code !== 0) {
       throw new Error(result.stderr || result.stdout || "No pude armar el PDF.");
