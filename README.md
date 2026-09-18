@@ -17,7 +17,7 @@ El horario de la jornada actual ya viene cargado, y el masivo también si está 
 
 ### Windows — ejecutable (recomendado)
 
-1. Bajá **[GeneradorPlanillasLCH.exe](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest/download/GeneradorPlanillasLCH.exe)** (también está en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest)).
+1. Bajá **[GeneradorPlanillasLCH.exe](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest/download/GeneradorPlanillasLCH.exe)** (también está en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest) y en `bin/GeneradorPlanillasLCH.exe` del repo).
 2. Doble clic. Si Windows avisa que es desconocido, tocá **Más info → Ejecutar de todas formas**.
 3. Se abre el navegador en `http://127.0.0.1:43147`.
 4. Tocá **Armar planillas**. Se descarga `planillas-cancha.pdf`.
@@ -125,7 +125,7 @@ npm run dev
 
 ## Ejecutable de Windows
 
-Cada push a `main` arma `GeneradorPlanillasLCH.exe` en GitHub Actions y lo publica en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest).
+Cada push a `main` arma `GeneradorPlanillasLCH.exe` en GitHub Actions y lo publica en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest). La misma copia queda en `bin/GeneradorPlanillasLCH.exe`.
 
 Localmente (en una PC con Windows):
 
