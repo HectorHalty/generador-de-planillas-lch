@@ -40,14 +40,16 @@ export function renderAnalyzePage(
     schedule: string;
     source: string;
     sort: string;
-    index: string;
-    blanks: string;
     date: string;
+    players: string;
   },
 ) {
   const removed = summary.removedTeams ?? [];
   const unmatched = summary.unmatchedMatches ?? [];
   const warnings = summary.warnings ?? [];
+  const marks = summary.playerMarks ?? [];
+  const foundMarks = marks.filter((item) => item.found);
+  const missingMarks = marks.filter((item) => !item.found);
   const dropped = (summary.removedPages ?? []).filter((page) =>
     page.reason.toLowerCase().includes("fuera"),
   );
@@ -60,7 +62,7 @@ export function renderAnalyzePage(
     ? `<p>${unmatched.length} partido${unmatched.length === 1 ? "" : "s"} no estaban en el PDF original.${
         summary.createdPlanillas
           ? ` Al armar, se crean ${summary.createdPlanillas} planillas nuevas.`
-          : " Marcá “Completar faltantes” para crearlas."
+          : " Esas hojas no se agregan."
       }</p>`
     : `<p>Los ${summary.schedule?.matchCount ?? 0} partidos del horario tienen hoja en el masivo.</p>`;
 
@@ -85,14 +87,32 @@ export function renderAnalyzePage(
         ${dropped.length ? `<p>Se eliminan ${dropped.length} hoja${dropped.length === 1 ? "" : "s"} con esos equipos (y la hoja extra de firmas, si la tenían).</p>` : ""}
         <h2>Partidos</h2>
         ${pending}
+        ${
+          foundMarks.length
+            ? `<h2>Filas en celeste</h2><ul>${foundMarks
+                .map(
+                  (item) =>
+                    `<li>${escapeHtml(item.name)} (${escapeHtml(item.team)})${
+                      item.page ? ` · página ${item.page}` : ""
+                    }</li>`,
+                )
+                .join("")}</ul>`
+            : ""
+        }
+        ${
+          missingMarks.length
+            ? `<h2>No están en la planilla</h2><ul class="chips">${missingMarks
+                .map((item) => `<li>${escapeHtml(item.warning || item.name)}</li>`)
+                .join("")}</ul>`
+            : ""
+        }
         ${warn}
         <form action="/api/generate" method="post" enctype="multipart/form-data">
           <input type="hidden" name="schedule" value="${escapeAttribute(fields.schedule)}" />
           <input type="hidden" name="source" value="${escapeAttribute(fields.source)}" />
           <input type="hidden" name="sort" value="${escapeAttribute(fields.sort)}" />
-          <input type="hidden" name="index" value="${escapeAttribute(fields.index)}" />
-          <input type="hidden" name="blanks" value="${escapeAttribute(fields.blanks)}" />
           <input type="hidden" name="date" value="${escapeAttribute(fields.date)}" />
+          <input type="hidden" name="players" value="${escapeAttribute(fields.players)}" />
           <div class="actions">
             <button class="btn primary" type="submit">Armar planillas</button>
             <a class="btn" href="/">Volver a editar</a>

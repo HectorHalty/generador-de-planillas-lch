@@ -56,20 +56,20 @@ export async function parseScheduleText(schedule: string) {
   }
 }
 
-export async function analyzePdf(pdf: Buffer, schedule: string) {
+export async function analyzePdf(pdf: Buffer, schedule: string, players?: string) {
   const folder = await mkdtemp(path.join(tmpdir(), "planillero-"));
   try {
     const pdfPath = path.join(folder, "entrada.pdf");
     const schedulePath = path.join(folder, "horario.txt");
     await writeFile(pdfPath, pdf);
     await writeFile(schedulePath, schedule, "utf8");
-    const result = await runPython([
-      "analyze",
-      "--pdf",
-      pdfPath,
-      "--schedule",
-      schedulePath,
-    ]);
+    const args = ["analyze", "--pdf", pdfPath, "--schedule", schedulePath];
+    if (players?.trim()) {
+      const playersPath = path.join(folder, "jugadores.txt");
+      await writeFile(playersPath, players, "utf8");
+      args.push("--players", playersPath);
+    }
+    const result = await runPython(args);
     if (result.code !== 0) {
       throw new Error(result.stderr || result.stdout || "No pude analizar el PDF.");
     }
@@ -86,6 +86,7 @@ export async function generatePdf(options: {
   includeIndex: boolean;
   createMissing: boolean;
   matchDate?: string;
+  players?: string;
 }) {
   const folder = await mkdtemp(path.join(tmpdir(), "planillero-"));
   try {
@@ -108,6 +109,11 @@ export async function generatePdf(options: {
     if (options.includeIndex) args.push("--index");
     if (!options.createMissing) args.push("--no-blanks");
     if (options.matchDate) args.push("--date", options.matchDate);
+    if (options.players?.trim()) {
+      const playersPath = path.join(folder, "jugadores.txt");
+      await writeFile(playersPath, options.players, "utf8");
+      args.push("--players", playersPath);
+    }
     const result = await runPython(args);
     if (result.code !== 0) {
       throw new Error(result.stderr || result.stdout || "No pude armar el PDF.");

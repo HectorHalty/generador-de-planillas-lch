@@ -16,16 +16,15 @@ export async function POST(request: Request) {
     const schedule = String(form.get("schedule") ?? "");
     const source = String(form.get("source") ?? (form.get("sample") === "1" ? "ejemplo" : "masivo"));
     const sort = String(form.get("sort") ?? "category");
-    const index = String(form.get("index") ?? "0");
-    const blanks = String(form.get("blanks") ?? "1");
     const date = String(form.get("date") ?? "");
+    const players = String(form.get("players") ?? "");
     const file = form.get("pdf");
     const pdf = await resolveUploadedPdf(file, source, schedule);
-    const payload = (await analyzePdf(pdf, schedule)) as ProcessSummary;
+    const payload = (await analyzePdf(pdf, schedule, players)) as ProcessSummary;
     const compact = compactClientSummary(payload as unknown as Record<string, unknown>) as ProcessSummary;
     if (html) {
       return htmlResponse(
-        renderAnalyzePage(compact, { schedule, source, sort, index, blanks, date }),
+        renderAnalyzePage(compact, { schedule, source, sort, date, players }),
       );
     }
     return NextResponse.json(compact);

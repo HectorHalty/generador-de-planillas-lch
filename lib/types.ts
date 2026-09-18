@@ -45,4 +45,13 @@ export type ProcessSummary = {
   keptOriginalPages?: number;
   createdPlanillas?: number;
   matchDate?: string;
+  playerMarks?: PlayerMark[];
+};
+
+export type PlayerMark = {
+  name: string;
+  team: string;
+  found: boolean;
+  page: number | null;
+  warning: string | null;
 };

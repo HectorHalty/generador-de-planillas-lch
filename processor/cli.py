@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from processor.pipeline import ProcessOptions, analyze_document, generate_document, load_default_schedule
+from processor.players import parse_player_marks
 from processor.sample import write_sample_pdf
 
 
@@ -61,9 +62,13 @@ def main(argv: list[str] | None = None) -> int:
 
     pdf_bytes = Path(args.pdf).read_bytes() if args.pdf else b""
     schedule = Path(args.schedule).read_text(encoding="utf-8") if args.schedule else load_default_schedule(root)
+    marked, parse_errors = _load_players(getattr(args, "players", None))
 
     if args.command == "analyze":
-        print(json.dumps(analyze_document(pdf_bytes, schedule), ensure_ascii=False))
+        payload = analyze_document(pdf_bytes, schedule, players=marked)
+        if parse_errors:
+            payload.setdefault("warnings", []).extend(parse_errors)
+        print(json.dumps(payload, ensure_ascii=False))
         return 0
 
     from processor.dates import parse_iso_date
@@ -73,8 +78,11 @@ def main(argv: list[str] | None = None) -> int:
         include_index=args.include_index,
         create_missing=not args.no_blanks,
         match_date=parse_iso_date(args.date),
+        players=marked,
     )
     pdf_out, summary = generate_document(pdf_bytes, schedule, options)
+    if parse_errors:
+        summary.setdefault("warnings", []).extend(parse_errors)
     Path(args.out).write_bytes(pdf_out)
     summary_path = Path(args.out).with_suffix(".json")
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -85,6 +93,17 @@ def main(argv: list[str] | None = None) -> int:
 def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pdf")
     parser.add_argument("--schedule")
+    parser.add_argument(
+        "--players",
+        help="Archivo de texto con un jugador por línea: Nombre Apellido (Equipo).",
+    )
+
+
+def _load_players(path: str | None) -> tuple[list, list[str]]:
+    if not path:
+        return [], []
+    text = Path(path).read_text(encoding="utf-8")
+    return parse_player_marks(text)
 
 
 if __name__ == "__main__":

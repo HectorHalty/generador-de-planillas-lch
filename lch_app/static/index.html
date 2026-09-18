@@ -15,6 +15,8 @@
         --line: #e4dccb;
         --danger: #7a2e24;
         --danger-bg: #f8e4e0;
+        --celeste: #c8eaf6;
+        --celeste-ink: #1d4f63;
       }
       * { box-sizing: border-box; }
       body {
@@ -63,29 +65,44 @@
       }
       button.primary, .btn.primary { background: var(--pitch); color: #f7f3ea; border-color: transparent; }
       button:disabled { opacity: 0.55; cursor: wait; }
-      textarea, input[type="date"], input[type="file"] { width: 100%; font: inherit; }
+      textarea, input[type="date"], input[type="file"], input[type="text"] { width: 100%; font: inherit; }
       textarea {
         min-height: 16rem; resize: vertical; border: 1px solid var(--line);
         border-radius: 0.7rem; padding: 0.7rem; font-family: ui-monospace, monospace;
         font-size: 0.78rem; line-height: 1.45; background: #fff;
       }
+      input[type="text"] {
+        border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.5rem 0.7rem;
+        background: #fff; min-height: 2.6rem;
+      }
       .drop {
         border: 1px dashed #c9c0aa; border-radius: 0.9rem; padding: 1.2rem;
         text-align: center; background: #f7f3ea; margin-bottom: 0.7rem;
       }
-      .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+      .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; align-items: flex-end; }
       label.check { display: flex; gap: 0.6rem; align-items: flex-start; border: 1px solid var(--line); border-radius: 0.8rem; padding: 0.8rem; }
+      label.field { flex: 1; min-width: 10rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+      label.field span { color: var(--muted); }
       .side { max-height: min(70vh, 640px); overflow: auto; }
       .match { border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.55rem 0.7rem; margin: 0.4rem 0; background: #fff; }
       .time { color: var(--pitch); font-size: 0.78rem; font-weight: 600; }
       .alert { border-radius: 0.8rem; padding: 0.8rem 0.9rem; margin-top: 0.8rem; }
       .alert.bad { background: var(--danger-bg); color: var(--danger); }
       .alert.ok { background: #eef3e6; }
+      .alert.celeste { background: var(--celeste); color: var(--celeste-ink); }
       .mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.6rem; }
       .mini div { background: #eef3e6; border-radius: 0.6rem; padding: 0.55rem 0.65rem; }
       .mini span { display: block; font-size: 0.75rem; color: var(--muted); }
       ol { color: var(--muted); padding-left: 1.2rem; }
       .group-title { display: flex; justify-content: space-between; margin: 0.8rem 0 0.3rem; font-family: Fraunces, Georgia, serif; }
+      .players { list-style: none; padding: 0; margin: 0.7rem 0 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+      .players li {
+        display: flex; align-items: center; gap: 0.35rem;
+        background: var(--celeste); color: var(--celeste-ink);
+        border-radius: 999px; padding: 0.25rem 0.4rem 0.25rem 0.8rem; font-size: 0.9rem;
+      }
+      .players button { min-height: 1.7rem; padding: 0 0.55rem; border-radius: 999px; font-size: 0.8rem; }
+      .empty-players { margin: 0.6rem 0 0; }
     </style>
   </head>
   <body>
@@ -93,7 +110,7 @@
       <div class="wrap">
         <p class="kicker">La Chacra Fútbol</p>
         <h1>Generador de Planillas LCH</h1>
-        <p>El masivo ya está cargado. Completa día, cancha y hora, tira los equipos que no juegan, y no agrega las hojas de cruces ni la franja de margen.</p>
+        <p>El masivo ya está cargado. Completa día, cancha y hora, tira los equipos que no juegan, y podés marcar jugadores en celeste en la planilla de su equipo.</p>
         <div class="stats">
           <div class="stat"><span>Partidos</span><strong id="stat-matches">—</strong></div>
           <div class="stat"><span>Equipos</span><strong id="stat-teams">—</strong></div>
@@ -128,8 +145,6 @@
             </ol>
             <div class="row">
               <button type="button" id="use-masivo" class="primary">Usar el masivo</button>
-              <button type="button" id="use-ejemplo">Ejemplo de prueba</button>
-              <a class="btn" href="/api/sample">Descargar ejemplo</a>
             </div>
             <input type="hidden" name="source" id="source" value="masivo" />
           </section>
@@ -143,8 +158,28 @@
             </div>
           </section>
           <section class="card" style="margin-top:1rem">
-            <h2>3. Cómo armar el PDF</h2>
-            <p class="hint">Se completa el sábado, cancha y hora. No se agregan las hojas de cruces ni la franja de margen.</p>
+            <h2>3. Jugadores a marcar</h2>
+            <p class="hint">Agregá el nombre y el equipo, por ejemplo <strong>Ezequiel Guzman (Mimetizarte)</strong>. En la planilla de ese club se pinta la fila de celeste clarito. Si no está, te aviso.</p>
+            <div class="row">
+              <label class="field">
+                <span>Nombre</span>
+                <input type="text" id="player-name" placeholder="Ezequiel Guzman" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Equipo</span>
+                <input type="text" id="player-team" placeholder="Mimetizarte" autocomplete="off" />
+              </label>
+              <button type="button" id="add-player" class="primary">Agregar</button>
+            </div>
+            <p class="hint" style="margin-top:0.6rem">También podés pegar todo junto en Nombre: <code>Ezequiel Guzman (Mimetizarte)</code>.</p>
+            <p id="player-error" class="alert bad" hidden></p>
+            <ul class="players" id="player-list"></ul>
+            <p class="hint empty-players" id="player-empty">Todavía no hay jugadores marcados.</p>
+            <textarea name="players" id="players" hidden></textarea>
+          </section>
+          <section class="card" style="margin-top:1rem">
+            <h2>4. Cómo armar el PDF</h2>
+            <p class="hint">Se completa el sábado, cancha y hora. El PDF arranca en las planillas, sin índice ni planillas en blanco de más.</p>
             <div class="row">
               <label class="check" style="flex:1">
                 <span>
@@ -153,17 +188,7 @@
                   <span class="hint">Por defecto el sábado próximo (__DATE_LABEL__).</span>
                 </span>
               </label>
-              <label class="check" style="flex:1">
-                <input type="checkbox" id="blanks-ui" checked />
-                <span><strong>Completar faltantes</strong><br /><span class="hint">Crea una planilla en blanco si el partido no estaba en el PDF.</span></span>
-              </label>
             </div>
-            <label class="check" style="margin-top:0.6rem">
-              <input type="checkbox" id="index-ui" />
-              <span><strong>Hojas de cruces al frente</strong><br /><span class="hint">Apagado: el PDF arranca en las planillas.</span></span>
-            </label>
-            <input type="hidden" name="index" id="index" value="0" />
-            <input type="hidden" name="blanks" id="blanks" value="1" />
             <input type="hidden" name="sort" id="sort" value="category" />
             <div class="row">
               <button type="button" id="sort-cat" class="primary">Hombres, después mujeres</button>
@@ -186,6 +211,14 @@
       const scheduleEl = document.getElementById("schedule");
       const sourceEl = document.getElementById("source");
       const fileEl = document.getElementById("pdf-file");
+      const playerNameEl = document.getElementById("player-name");
+      const playerTeamEl = document.getElementById("player-team");
+      const playerListEl = document.getElementById("player-list");
+      const playersField = document.getElementById("players");
+      const playerError = document.getElementById("player-error");
+      const playerEmpty = document.getElementById("player-empty");
+      const playerLine = /^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$/;
+      const markedPlayers = [];
 
       function parseSchedule(text) {
         const matches = [];
@@ -235,6 +268,53 @@
         });
       }
 
+      function renderPlayers() {
+        playersField.value = markedPlayers.map((item) => item.raw).join("\n");
+        playerListEl.innerHTML = "";
+        playerEmpty.hidden = markedPlayers.length > 0;
+        markedPlayers.forEach((item, index) => {
+          const li = document.createElement("li");
+          li.appendChild(document.createTextNode(item.raw));
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "Quitar";
+          remove.addEventListener("click", () => {
+            markedPlayers.splice(index, 1);
+            renderPlayers();
+          });
+          li.appendChild(remove);
+          playerListEl.appendChild(li);
+        });
+      }
+
+      function addPlayer() {
+        playerError.hidden = true;
+        let name = playerNameEl.value.trim();
+        let team = playerTeamEl.value.trim();
+        const combined = playerLine.exec(name);
+        if (combined) {
+          name = combined[1].trim();
+          team = team || combined[2].trim();
+        }
+        if (name.length < 3 || team.length < 2) {
+          playerError.hidden = false;
+          playerError.textContent = "Escribí el nombre y el equipo, por ejemplo Ezequiel Guzman (Mimetizarte).";
+          return;
+        }
+        const raw = name + " (" + team + ")";
+        const key = raw.toLowerCase();
+        if (markedPlayers.some((item) => item.raw.toLowerCase() === key)) {
+          playerError.hidden = false;
+          playerError.textContent = "Ese jugador ya está en la lista.";
+          return;
+        }
+        markedPlayers.push({ name, team, raw });
+        playerNameEl.value = "";
+        playerTeamEl.value = "";
+        playerNameEl.focus();
+        renderPlayers();
+      }
+
       function setSource(source, file) {
         sourceEl.value = file ? "upload" : source;
         const label = document.getElementById("source-label");
@@ -242,12 +322,9 @@
         if (file) {
           label.textContent = file.name;
           hint.textContent = "Listo. Si no es ese, elegí otro PDF.";
-        } else if (source === "masivo") {
+        } else {
           label.textContent = "Planillas de Cancha - Masivo.pdf";
           hint.textContent = "Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo.";
-        } else {
-          label.textContent = "Planilla de ejemplo";
-          hint.textContent = "Ejemplo de prueba, con equipos de más para ver el recorte.";
         }
         if (!file) fileEl.value = "";
       }
@@ -257,10 +334,14 @@
         if (fileEl.files[0]) setSource("upload", fileEl.files[0]);
       });
       document.getElementById("use-masivo").onclick = () => setSource("masivo");
-      document.getElementById("use-ejemplo").onclick = () => setSource("ejemplo");
       document.getElementById("restore").onclick = () => { scheduleEl.value = defaultSchedule; render(); };
-      document.getElementById("blanks-ui").onchange = (e) => { document.getElementById("blanks").value = e.target.checked ? "1" : "0"; };
-      document.getElementById("index-ui").onchange = (e) => { document.getElementById("index").value = e.target.checked ? "1" : "0"; };
+      document.getElementById("add-player").onclick = addPlayer;
+      playerNameEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); addPlayer(); }
+      });
+      playerTeamEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); addPlayer(); }
+      });
       document.getElementById("sort-cat").onclick = () => {
         document.getElementById("sort").value = "category";
         document.getElementById("sort-cat").classList.add("primary");
@@ -339,6 +420,10 @@
         const box = document.getElementById("summary");
         box.hidden = false;
         const removed = payload.removedTeams || [];
+        const marks = payload.playerMarks || [];
+        const found = marks.filter((item) => item.found);
+        const missing = marks.filter((item) => !item.found);
+        const warnings = (payload.warnings || []).filter((item) => !missing.some((mark) => mark.warning === item));
         box.innerHTML =
           '<div class="mini"><div><span>Hojas originales</span><strong>' + (payload.pageCount ?? "—") +
           '</strong></div><div><span>Se conservan</span><strong>' + (payload.keptOriginalPages ?? (payload.keptPages || []).length) +
@@ -347,10 +432,24 @@
           (payload.matchDate ? '<p class="hint">Día completado: <strong>' + payload.matchDate + '</strong></p>' : '') +
           (removed.length
             ? '<div class="alert bad"><strong>Equipos fuera de la jornada</strong><div>' + removed.join(" · ") + "</div></div>"
-            : '<div class="alert ok"><strong>Nadie de más</strong><div>Todos los equipos del documento están en el horario.</div></div>');
+            : '<div class="alert ok"><strong>Nadie de más</strong><div>Todos los equipos del documento están en el horario.</div></div>') +
+          (found.length
+            ? '<div class="alert celeste"><strong>Filas en celeste</strong><div>' +
+              found.map((item) => item.name + " (" + item.team + ")" + (item.page ? " · página " + item.page : "")).join("<br />") +
+              "</div></div>"
+            : "") +
+          (missing.length
+            ? '<div class="alert bad"><strong>No están en la planilla</strong><div>' +
+              missing.map((item) => item.warning || ("No encuentro a " + item.name + " en la planilla de " + item.team + ".")).join("<br />") +
+              "</div></div>"
+            : "") +
+          (warnings.length
+            ? '<ul class="hint" style="margin-top:0.8rem">' + warnings.map((item) => "<li>" + item + "</li>").join("") + "</ul>"
+            : "");
       }
 
       render();
+      renderPlayers();
     </script>
   </body>
 </html>

@@ -12,15 +12,18 @@ import {
   MapPinned,
   Trash2,
   Upload,
+  UserPlus,
   Users,
+  X,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { MatchInfo, ProcessSummary, SchedulePayload } from "@/lib/types";
+import type { MatchInfo, PlayerMark, ProcessSummary, SchedulePayload } from "@/lib/types";
 import { parseSchedule } from "@/lib/parse-schedule";
 import { formatSheetDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -37,9 +40,11 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
   const [source, setSource] = useState<"masivo" | "ejemplo" | "upload">("masivo");
   const [dragOver, setDragOver] = useState(false);
   const [sortMode, setSortMode] = useState<"category" | "court">("category");
-  const [includeIndex, setIncludeIndex] = useState(false);
-  const [createMissing, setCreateMissing] = useState(true);
   const [matchDate, setMatchDate] = useState(defaultMatchDate);
+  const [playerName, setPlayerName] = useState("");
+  const [playerTeam, setPlayerTeam] = useState("");
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [players, setPlayers] = useState<string[]>([]);
   const [parsed, setParsed] = useState<SchedulePayload>(() => parseSchedule(defaultSchedule));
   const [parseError, setParseError] = useState<string | null>(
     () => parseSchedule(defaultSchedule).errors[0] ?? null,
@@ -64,11 +69,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
   const grouped = useMemo(() => groupMatches(parsed.matches), [parsed]);
   const sourceLabel =
     file?.name ??
-    (source === "masivo"
-      ? "Planillas de Cancha - Masivo.pdf"
-      : source === "ejemplo"
-        ? "Planilla de ejemplo"
-        : "Sin documento");
+    (source === "masivo" ? "Planillas de Cancha - Masivo.pdf" : "Sin documento");
 
   function onPickFile(next: File | null, nextSource: "masivo" | "ejemplo" | "upload" = "upload") {
     setFile(next);
@@ -78,6 +79,29 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
     if (!next && inputRef.current) inputRef.current.value = "";
     if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+  }
+
+  function addPlayer() {
+    let name = playerName.trim();
+    let team = playerTeam.trim();
+    const combined = /^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$/.exec(name);
+    if (combined) {
+      name = combined[1].trim();
+      team = team || combined[2].trim();
+    }
+    if (name.length < 3 || team.length < 2) {
+      setPlayerError("Escribí el nombre y el equipo, por ejemplo Ezequiel Guzman (Mimetizarte).");
+      return;
+    }
+    const raw = `${name} (${team})`;
+    if (players.some((item) => item.toLowerCase() === raw.toLowerCase())) {
+      setPlayerError("Ese jugador ya está en la lista.");
+      return;
+    }
+    setPlayers((current) => [...current, raw]);
+    setPlayerName("");
+    setPlayerTeam("");
+    setPlayerError(null);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -98,9 +122,8 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       form.set("schedule", schedule);
       form.set("source", file ? "upload" : source);
       form.set("sort", sortMode);
-      form.set("index", includeIndex ? "1" : "0");
-      form.set("blanks", createMissing ? "1" : "0");
       form.set("date", matchDate);
+      form.set("players", players.join("\n"));
       if (file) form.set("pdf", file);
 
       if (kind === "analyze") {
@@ -152,8 +175,8 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
             <h1 className="font-heading text-4xl leading-none sm:text-5xl">Generador de Planillas LCH</h1>
             <p className="max-w-xl text-sm text-primary-foreground/80">
               El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
-              El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada,
-              sin las hojas de cruces ni la franja de margen.
+              El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada.
+              Podés marcar jugadores en celeste en la planilla de su equipo.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -176,8 +199,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       >
         <input type="hidden" name="source" value={file ? "upload" : source} />
         <input type="hidden" name="sort" value={sortMode} />
-        <input type="hidden" name="index" value={includeIndex ? "1" : "0"} />
-        <input type="hidden" name="blanks" value={createMissing ? "1" : "0"} />
+        <input type="hidden" name="players" value={players.join("\n")} />
 
         <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2">
@@ -263,9 +285,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
                     <p className="text-muted-foreground text-sm">
                       {file
                         ? "Listo. Si no es ese, elegí otro PDF abajo."
-                        : source === "masivo"
-                          ? "Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo."
-                          : "Clic acá o usá Elegir archivo. También sirve arrastrarlo."}
+                        : "Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo."}
                     </p>
                   </div>
                 </label>
@@ -301,16 +321,6 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
                     <FileText data-icon="inline-start" />
                     Usar el masivo
                   </Button>
-                  <Button
-                    type="button"
-                    variant={source === "ejemplo" && !file ? "default" : "outline"}
-                    onClick={() => onPickFile(null, "ejemplo")}
-                  >
-                    Ejemplo de prueba
-                  </Button>
-                  <a className={cn(buttonVariants({ variant: "outline" }))} href="/api/sample">
-                    Descargar ejemplo
-                  </a>
                 </div>
               </CardContent>
             </Card>
@@ -368,16 +378,93 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
 
             <Card>
               <CardHeader>
-                <CardTitle>3. Cómo armar el PDF</CardTitle>
+                <CardTitle>3. Jugadores a marcar</CardTitle>
+                <CardDescription>
+                  Agregá el nombre y el equipo, por ejemplo{" "}
+                  <span className="font-medium">Ezequiel Guzman (Mimetizarte)</span>. En la
+                  planilla de ese club se pinta la fila de celeste clarito. Si no está, te aviso.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <label className="flex-1 space-y-1 text-sm">
+                    <span className="text-muted-foreground">Nombre</span>
+                    <Input
+                      value={playerName}
+                      onChange={(event) => setPlayerName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addPlayer();
+                        }
+                      }}
+                      placeholder="Ezequiel Guzman"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label className="flex-1 space-y-1 text-sm">
+                    <span className="text-muted-foreground">Equipo</span>
+                    <Input
+                      value={playerTeam}
+                      onChange={(event) => setPlayerTeam(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addPlayer();
+                        }
+                      }}
+                      placeholder="Mimetizarte"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <Button type="button" onClick={addPlayer}>
+                    <UserPlus data-icon="inline-start" />
+                    Agregar
+                  </Button>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  También podés pegar todo junto en Nombre:{" "}
+                  <span className="font-mono">Ezequiel Guzman (Mimetizarte)</span>.
+                </p>
+                {playerError ? <p className="text-destructive text-sm">{playerError}</p> : null}
+                {players.length ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {players.map((item) => (
+                      <li
+                        key={item}
+                        className="inline-flex items-center gap-1 rounded-full bg-[#c8eaf6] px-3 py-1 text-sm text-[#1d4f63]"
+                      >
+                        {item}
+                        <button
+                          type="button"
+                          className="rounded-full p-0.5 hover:bg-white/60"
+                          onClick={() =>
+                            setPlayers((current) => current.filter((player) => player !== item))
+                          }
+                          aria-label={`Quitar ${item}`}
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Todavía no hay jugadores marcados.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>4. Cómo armar el PDF</CardTitle>
                 <CardDescription>
                   Se conservan las hojas de equipos que sí juegan, se completa día, cancha y
-                  hora, y se tiran las que no están en el horario. No se agregan las hojas de
-                  cruces ni la franja de margen.
+                  hora, y se tiran las que no están en el horario.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                  <label className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:col-span-2">
                     <span className="flex items-center gap-2 font-medium">
                       <CalendarDays className="size-4 text-primary" />
                       Día de la jornada
@@ -392,35 +479,6 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
                     <span className="text-muted-foreground text-sm">
                       Se completa el campo Día con el sábado próximo
                       {matchDate ? ` (${formatSheetDate(matchDate)})` : ""}.
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 rounded-lg border border-border p-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
-                      checked={createMissing}
-                      onChange={(event) => setCreateMissing(event.target.checked)}
-                    />
-                    <span>
-                      <span className="block font-medium">Completar faltantes</span>
-                      <span className="text-muted-foreground text-sm">
-                        Si un partido no está en el PDF, se crea una planilla en blanco.
-                      </span>
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 rounded-lg border border-border p-3 sm:col-span-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
-                      checked={includeIndex}
-                      onChange={(event) => setIncludeIndex(event.target.checked)}
-                    />
-                    <span>
-                      <span className="block font-medium">Hojas de cruces al frente</span>
-                      <span className="text-muted-foreground text-sm">
-                        Apagado: el PDF arranca en las planillas, sin el índice de partidos ni
-                        la franja de margen.
-                      </span>
                     </span>
                   </label>
                 </div>
@@ -652,12 +710,52 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
             : " quedaron pendientes."}
         </p>
       ) : null}
+      <PlayerMarksPanel marks={summary.playerMarks ?? []} />
       {summary.warnings?.length ? (
         <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm">
-          {summary.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
+          {summary.warnings
+            .filter((warning) => !(summary.playerMarks ?? []).some((mark) => mark.warning === warning))
+            .map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
         </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
+  if (!marks.length) return null;
+  const found = marks.filter((item) => item.found);
+  const missing = marks.filter((item) => !item.found);
+  return (
+    <div className="space-y-2">
+      {found.length ? (
+        <Alert className="border-[#9fd6ea] bg-[#c8eaf6] text-[#1d4f63]">
+          <CheckCircle2 />
+          <AlertTitle>Filas en celeste</AlertTitle>
+          <AlertDescription>
+            {found.map((item) => (
+              <span key={`${item.name}-${item.team}`} className="block">
+                {item.name} ({item.team})
+                {item.page ? ` · página ${item.page}` : ""}
+              </span>
+            ))}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {missing.length ? (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>No están en la planilla</AlertTitle>
+          <AlertDescription>
+            {missing.map((item) => (
+              <span key={`${item.name}-${item.team}`} className="block">
+                {item.warning || `No encuentro a ${item.name} en la planilla de ${item.team}.`}
+              </span>
+            ))}
+          </AlertDescription>
+        </Alert>
       ) : null}
     </div>
   );

@@ -12,6 +12,7 @@ export function compactClientSummary(
     removedTeams: summary.removedTeams ?? [],
     unmatchedMatches: summary.unmatchedMatches ?? [],
     warnings: summary.warnings ?? [],
+    playerMarks: summary.playerMarks ?? [],
     matchDate: summary.matchDate,
     schedule: {
       matchCount: schedule.matchCount ?? 0,

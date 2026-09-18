@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from lch_app.paths import output_pdf_path, public_dir, static_dir
 from processor.dates import format_sheet_date, next_saturday, parse_iso_date
 from processor.pipeline import ProcessOptions, analyze_document, generate_document
+from processor.players import parse_player_marks
 from processor.sample import write_sample_pdf
 
 app = FastAPI(title="Generador de Planillas LCH")
@@ -44,13 +45,17 @@ def defaults() -> dict:
 async def analyze(
     schedule: str = Form(""),
     source: str = Form("masivo"),
+    players: str = Form(""),
     pdf: UploadFile | None = File(None),
 ) -> JSONResponse:
     try:
         pdf_bytes = await _resolve_pdf(pdf, source, schedule)
-        payload = analyze_document(pdf_bytes, schedule)
+        marked, parse_errors = parse_player_marks(players)
+        payload = analyze_document(pdf_bytes, schedule, players=marked)
         if not payload.get("ok"):
             return JSONResponse({"error": payload.get("error") or "No pude analizar el PDF."}, status_code=400)
+        if parse_errors:
+            payload.setdefault("warnings", []).extend(parse_errors)
         return JSONResponse(_client_summary(payload))
     except Exception as error:  # noqa: BLE001
         return JSONResponse({"error": str(error)}, status_code=400)
@@ -65,19 +70,24 @@ async def generate(
     index: str = Form("0"),
     blanks: str = Form("1"),
     date: str = Form(""),
+    players: str = Form(""),
     pdf: UploadFile | None = File(None),
 ) -> Response:
     try:
         pdf_bytes = await _resolve_pdf(pdf, source, schedule)
+        marked, parse_errors = parse_player_marks(players)
         options = ProcessOptions(
             sort_mode="court" if sort == "court" else "category",
-            include_index=index == "1",
-            create_missing=blanks != "0",
+            include_index=False,
+            create_missing=False,
             match_date=parse_iso_date(date) or next_saturday(),
+            players=marked,
         )
         pdf_out, summary = generate_document(pdf_bytes, schedule, options)
         out = output_pdf_path()
         out.write_bytes(pdf_out)
+        if parse_errors:
+            summary.setdefault("warnings", []).extend(parse_errors)
         compact = _client_summary(summary, {"downloadUrl": "/api/output/planillas-cancha.pdf"})
         accept = (request.headers.get("accept") or "").lower()
         if "application/json" in accept or "application/pdf" not in accept:
@@ -170,6 +180,7 @@ def _client_summary(summary: dict, extra: dict | None = None) -> dict:
         "removedTeams": summary.get("removedTeams") or [],
         "unmatchedMatches": summary.get("unmatchedMatches") or [],
         "warnings": summary.get("warnings") or [],
+        "playerMarks": summary.get("playerMarks") or [],
         "matchDate": summary.get("matchDate"),
         "schedule": {
             "matchCount": (summary.get("schedule") or {}).get("matchCount", 0),

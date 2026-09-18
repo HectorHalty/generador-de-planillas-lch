@@ -9,6 +9,7 @@ import pymupdf as fitz
 from processor.assign import AssignmentResult, assign_pages
 from processor.dates import format_sheet_date, next_saturday
 from processor.planilla import draw_index_pages, draw_match_planilla
+from processor.players import MarkedPlayer, apply_player_marks
 from processor.schedule import Match, ParseResult, parse_schedule, sort_matches
 from processor.stamp import stamp_page
 
@@ -17,11 +18,16 @@ from processor.stamp import stamp_page
 class ProcessOptions:
     sort_mode: str = "category"
     include_index: bool = False
-    create_missing: bool = True
+    create_missing: bool = False
     match_date: date | None = None
+    players: list[MarkedPlayer] | None = None
 
 
-def analyze_document(pdf_bytes: bytes, schedule_text: str) -> dict:
+def analyze_document(
+    pdf_bytes: bytes,
+    schedule_text: str,
+    players: list[MarkedPlayer] | None = None,
+) -> dict:
     parsed = parse_schedule(schedule_text)
     if not parsed.matches:
         return {
@@ -34,6 +40,17 @@ def analyze_document(pdf_bytes: bytes, schedule_text: str) -> dict:
     assignment = assign_pages(page_texts, parsed.matches)
     payload = _summary(parsed, assignment, page_count)
     payload["ok"] = True
+    if players:
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        payload["playerMarks"] = [
+            item.to_dict() for item in apply_player_marks(document, players, paint=False)
+        ]
+        document.close()
+        payload["warnings"] = list(payload.get("warnings") or []) + [
+            item["warning"] for item in payload["playerMarks"] if item.get("warning")
+        ]
+    else:
+        payload["playerMarks"] = []
     return payload
 
 
@@ -71,6 +88,7 @@ def generate_document(
             created_blank += 1
 
     source.close()
+    marks = apply_player_marks(output, options.players or [])
     pdf_out = output.tobytes()
     output.close()
 
@@ -80,6 +98,10 @@ def generate_document(
     summary["keptOriginalPages"] = kept_original
     summary["createdPlanillas"] = created_blank
     summary["matchDate"] = day
+    summary["playerMarks"] = [item.to_dict() for item in marks]
+    summary["warnings"] = list(summary.get("warnings") or []) + [
+        item.warning for item in marks if item.warning
+    ]
     return pdf_out, summary
 
 
