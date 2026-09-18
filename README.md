@@ -13,18 +13,25 @@ A partir del PDF masivo y el horario por cancha:
 
 El horario de la jornada actual ya viene cargado, y el masivo también si está en `public/planillas-masivo.pdf`.
 
-## Cómo usarlo (doble clic)
+## Cómo usarlo
 
-### Windows
+### Windows — ejecutable (recomendado)
 
-1. Instalá [Python 3.12+](https://www.python.org/downloads/). En el instalador **tildá “Add python.exe to PATH”**.
-2. Hacé **doble clic** en `Generador de Planillas LCH.bat` (también sirve `iniciar.bat`).
-3. La primera vez instala sola las librerías (un minuto). Después se abre el navegador.
+1. Bajá **[GeneradorPlanillasLCH.exe](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest/download/GeneradorPlanillasLCH.exe)** (también está en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest)).
+2. Doble clic. Si Windows avisa que es desconocido, tocá **Más info → Ejecutar de todas formas**.
+3. Se abre el navegador en `http://127.0.0.1:43147`.
 4. Tocá **Armar planillas**. Se descarga `planillas-cancha.pdf`.
 5. Si no se baja solo, tocá **Descargar PDF**.
 6. Dejá la ventana negra abierta mientras usás el programa. Cerrala para apagarlo.
 
-En GitHub **Actions → Build Windows executable** se puede bajar `GeneradorPlanillasLCH.exe`.
+No hace falta instalar Python.
+
+### Windows — con Python
+
+1. Instalá [Python 3.12+](https://www.python.org/downloads/). En el instalador **tildá “Add python.exe to PATH”**.
+2. Hacé **doble clic** en `Generador de Planillas LCH.bat` (también sirve `iniciar.bat`).
+3. La primera vez instala sola las librerías (un minuto). Después se abre el navegador.
+4. Tocá **Armar planillas**.
 
 ### macOS
 
@@ -41,7 +48,7 @@ chmod +x generador-de-planillas-lch.sh
 
 Variables opcionales: `LCH_PORT` (por defecto `43147`) y `LCH_HOST` (por defecto `0.0.0.0`).
 
-Si el navegador dice **Failed to fetch** o no puede hablar con el generador, abrí directo `http://127.0.0.1:43147` y dejá abierta la ventana negra de `lanzar.py`.
+Si el navegador no puede hablar con el generador, abrí directo `http://127.0.0.1:43147` y dejá abierta la ventana del programa.
 
 ## Cómo subir el PDF
 
@@ -116,12 +123,20 @@ npm install
 npm run dev
 ```
 
-Ejecutable de Windows, con PyInstaller:
+## Ejecutable de Windows
 
-```bash
-python3 -m pip install -r requirements.txt pyinstaller
+Cada push a `main` arma `GeneradorPlanillasLCH.exe` en GitHub Actions y lo publica en [Releases](https://github.com/HectorHalty/generador-de-planillas-lch/releases/latest).
+
+Localmente (en una PC con Windows):
+
+```bat
+python -m pip install -r requirements.txt pyinstaller
 pyinstaller --noconfirm --clean packaging/generador.spec
 ```
+
+El archivo queda en `dist/GeneradorPlanillasLCH.exe`.
+
+También se puede disparar a mano: GitHub → **Actions → Build Windows executable → Run workflow**.
 
 ## Licencia
 

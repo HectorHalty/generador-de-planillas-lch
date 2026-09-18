@@ -22,7 +22,11 @@ def public_dir() -> Path:
 
 
 def output_dir() -> Path:
-    path = app_root() / ".lch-output"
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        base = app_root()
+    path = base / ".lch-output"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

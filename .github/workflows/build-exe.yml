@@ -3,8 +3,12 @@ name: Build Windows executable
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags:
       - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -23,8 +27,30 @@ jobs:
         with:
           name: GeneradorPlanillasLCH-windows
           path: dist/GeneradorPlanillasLCH.exe
+      - name: Release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "title=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "title=Última versión" >> "$GITHUB_OUTPUT"
+          fi
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
           files: dist/GeneradorPlanillasLCH.exe
+          draft: false
+          prerelease: false
+          make_latest: true
+          body: |
+            Ejecutable de Windows del Generador de Planillas LCH.
+
+            1. Bajá `GeneradorPlanillasLCH.exe`.
+            2. Doble clic. Si Windows avisa, tocá **Más info → Ejecutar de todas formas**.
+            3. Se abre el navegador en http://127.0.0.1:43147.
+            4. Tocá **Armar planillas**. Dejá la ventana negra abierta.
