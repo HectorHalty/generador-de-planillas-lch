@@ -402,10 +402,10 @@
           '</strong></div></div>' +
           (payload.matchDate ? '<p class="hint">Día completado: <strong>' + payload.matchDate + '</strong></p>' : '') +
           (removed.length
-            ? '<div class="alert bad"><strong>Equipos fuera de la jornada</strong><div>' + removed.join(" · ") + "</div></div>"
+            ? '<div class="alert bad"><strong>Equipos Libres</strong><div>' + removed.join(" · ") + "</div></div>"
             : '<div class="alert ok"><strong>Nadie de más</strong><div>Todos los equipos del documento están en el horario.</div></div>') +
           (found.length
-            ? '<div class="alert mark"><strong>Filas marcadas</strong><div>' +
+            ? '<div class="alert mark"><strong>Suspendidos</strong><div>' +
               found.map((item) => item.name + " (" + item.team + ")" + (item.page ? " · página " + item.page : "")).join("<br />") +
               "</div></div>"
             : "") +

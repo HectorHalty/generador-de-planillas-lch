@@ -609,7 +609,7 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
       {summary.removedTeams?.length ? (
         <Alert variant="destructive">
           <Trash2 />
-          <AlertTitle>Equipos fuera de la jornada</AlertTitle>
+          <AlertTitle>Equipos Libres</AlertTitle>
           <AlertDescription>
             {summary.removedTeams.join(" · ")}
           </AlertDescription>
@@ -661,7 +661,7 @@ function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
       {found.length ? (
         <Alert className="border-neutral-400 bg-neutral-300 text-neutral-900">
           <CheckCircle2 />
-          <AlertTitle>Filas marcadas</AlertTitle>
+          <AlertTitle>Suspendidos</AlertTitle>
           <AlertDescription>
             {found.map((item) => (
               <span key={`${item.name}-${item.team}`} className="block">

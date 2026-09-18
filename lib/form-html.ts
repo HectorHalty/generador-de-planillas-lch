@@ -82,14 +82,14 @@ export function renderAnalyzePage(
           <div><span>Se conservan</span><strong>${summary.keptOriginalPages ?? summary.keptPages?.length ?? "—"}</strong></div>
           <div><span>Equipos a borrar</span><strong>${removed.length}</strong></div>
         </div>
-        <h2>Equipos fuera de la jornada</h2>
+        <h2>Equipos Libres</h2>
         ${extras}
         ${dropped.length ? `<p>Se eliminan ${dropped.length} hoja${dropped.length === 1 ? "" : "s"} con esos equipos (y la hoja extra de firmas, si la tenían).</p>` : ""}
         <h2>Partidos</h2>
         ${pending}
         ${
           foundMarks.length
-            ? `<h2>Filas marcadas</h2><ul>${foundMarks
+            ? `<h2>Suspendidos</h2><ul>${foundMarks
                 .map(
                   (item) =>
                     `<li>${escapeHtml(item.name)} (${escapeHtml(item.team)})${
