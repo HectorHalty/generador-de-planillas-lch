@@ -406,12 +406,12 @@
             : '<div class="alert ok"><strong>Nadie de más</strong><div>Todos los equipos del documento están en el horario.</div></div>') +
           (found.length
             ? '<div class="alert mark"><strong>Suspendidos</strong><div>' +
-              found.map((item) => item.name + " (" + item.team + ")" + (item.page ? " · página " + item.page : "")).join("<br />") +
+              found.map((item) => "Jugador: " + item.name + " · Equipo: " + item.team).join("<br />") +
               "</div></div>"
             : "") +
           (missing.length
-            ? '<div class="alert bad"><strong>No están en la planilla</strong><div>' +
-              missing.map((item) => item.warning || ("No encuentro a " + item.name + " en la planilla de " + item.team + ".")).join("<br />") +
+            ? '<div class="alert bad"><strong>Sin suspender</strong><div>' +
+              missing.map((item) => "Jugador: " + item.name + " · Equipo: " + item.team).join("<br />") +
               "</div></div>"
             : "") +
           (warnings.length

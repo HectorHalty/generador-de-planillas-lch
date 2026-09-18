@@ -665,8 +665,7 @@ function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
           <AlertDescription>
             {found.map((item) => (
               <span key={`${item.name}-${item.team}`} className="block">
-                {item.name} ({item.team})
-                {item.page ? ` · página ${item.page}` : ""}
+                Jugador: {item.name} · Equipo: {item.team}
               </span>
             ))}
           </AlertDescription>
@@ -675,11 +674,11 @@ function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
       {missing.length ? (
         <Alert variant="destructive">
           <AlertTriangle />
-          <AlertTitle>No están en la planilla</AlertTitle>
+          <AlertTitle>Sin suspender</AlertTitle>
           <AlertDescription>
             {missing.map((item) => (
               <span key={`${item.name}-${item.team}`} className="block">
-                {item.warning || `No encuentro a ${item.name} en la planilla de ${item.team}.`}
+                Jugador: {item.name} · Equipo: {item.team}
               </span>
             ))}
           </AlertDescription>

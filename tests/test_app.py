@@ -27,7 +27,12 @@ def test_home_renders_brand():
     assert "Completar faltantes" not in response.text
     assert "Ejemplo de prueba" not in response.text
     assert "Descargar ejemplo" not in response.text
-    assert "Hojas de cruces" not in response.text
+    assert "Equipos Libres" in response.text
+    assert "Sin suspender" in response.text
+    assert "Jugador:" in response.text
+    assert "Equipos fuera de la jornada" not in response.text
+    assert "Filas en celeste" not in response.text
+    assert "No están en la planilla" not in response.text
 
 
 def test_analyze_returns_compact_json():

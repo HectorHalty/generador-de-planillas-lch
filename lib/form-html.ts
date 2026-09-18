@@ -92,17 +92,18 @@ export function renderAnalyzePage(
             ? `<h2>Suspendidos</h2><ul>${foundMarks
                 .map(
                   (item) =>
-                    `<li>${escapeHtml(item.name)} (${escapeHtml(item.team)})${
-                      item.page ? ` · página ${item.page}` : ""
-                    }</li>`,
+                    `<li>Jugador: ${escapeHtml(item.name)} · Equipo: ${escapeHtml(item.team)}</li>`,
                 )
                 .join("")}</ul>`
             : ""
         }
         ${
           missingMarks.length
-            ? `<h2>No están en la planilla</h2><ul class="chips">${missingMarks
-                .map((item) => `<li>${escapeHtml(item.warning || item.name)}</li>`)
+            ? `<h2>Sin suspender</h2><ul class="chips">${missingMarks
+                .map(
+                  (item) =>
+                    `<li>Jugador: ${escapeHtml(item.name)} · Equipo: ${escapeHtml(item.team)}</li>`,
+                )
                 .join("")}</ul>`
             : ""
         }
