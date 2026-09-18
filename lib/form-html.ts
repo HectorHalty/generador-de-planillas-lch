@@ -89,7 +89,7 @@ export function renderAnalyzePage(
         ${pending}
         ${
           foundMarks.length
-            ? `<h2>Filas en celeste</h2><ul>${foundMarks
+            ? `<h2>Filas marcadas</h2><ul>${foundMarks
                 .map(
                   (item) =>
                     `<li>${escapeHtml(item.name)} (${escapeHtml(item.team)})${

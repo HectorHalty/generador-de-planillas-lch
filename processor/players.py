@@ -7,6 +7,7 @@ import pymupdf as fitz
 from rapidfuzz import fuzz
 
 from processor.assign import extract_club
+from processor.fonts import BOLD
 from processor.names import names_equivalent, normalize_name
 
 PLAYER_LINE = re.compile(r"^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$")
@@ -16,9 +17,12 @@ HEADER_LINE = re.compile(
     re.IGNORECASE,
 )
 HEADER_LABELS = {"nombre del jugador", "nombre", "dni", "fecha nac", "dorsal", "firma"}
-CELESTE = (0.62, 0.90, 0.98)
+ROW_FILL = (0.68, 0.68, 0.68)
 TABLE_LEFT = 37.5
 TABLE_RIGHT = 558.0
+ROW_HEIGHT_MIN = 15.0
+ROW_HEIGHT_MAX = 28.0
+SUSPENDIDO = "Suspendido"
 
 
 @dataclass(frozen=True)
@@ -143,11 +147,74 @@ def highlight_player_row(page: fitz.Page, player_name: str) -> bool:
 
 
 def _paint_row(page: fitz.Page, name_rect: fitz.Rect) -> None:
-    row = fitz.Rect(TABLE_LEFT, name_rect.y0 - 5, TABLE_RIGHT, name_rect.y1 + 11)
-    annot = page.add_highlight_annot(row)
-    annot.set_colors(stroke=CELESTE)
-    annot.set_opacity(0.55)
-    annot.update()
+    row = _row_rect(page, name_rect)
+    page.draw_rect(row, color=None, fill=ROW_FILL, width=0, overlay=False)
+    _write_suspendido(page, row)
+
+
+def _row_rect(page: fitz.Page, name_rect: fitz.Rect) -> fitz.Rect:
+    y_mid = (name_rect.y0 + name_rect.y1) / 2
+    y0s: list[float] = []
+    y1s: list[float] = []
+    x0s: list[float] = []
+    x1s: list[float] = []
+    for drawing in page.get_drawings():
+        rect = drawing.get("rect")
+        if rect is None:
+            continue
+        if rect.width >= 3 or not (ROW_HEIGHT_MIN <= rect.height <= ROW_HEIGHT_MAX):
+            continue
+        if rect.x0 < TABLE_LEFT - 4 or rect.x0 > TABLE_RIGHT + 4:
+            continue
+        if rect.y0 - 1 <= y_mid <= rect.y1 + 1:
+            y0s.append(rect.y0)
+            y1s.append(rect.y1)
+            x0s.append(rect.x0)
+            x1s.append(rect.x1)
+    if y0s and y1s:
+        return fitz.Rect(
+            min(x0s) if x0s else TABLE_LEFT,
+            min(y0s),
+            max(x1s) if x1s else TABLE_RIGHT,
+            max(y1s),
+        )
+    return fitz.Rect(TABLE_LEFT, name_rect.y0 - 4, TABLE_RIGHT, name_rect.y1 + 5)
+
+
+def _firma_rect(page: fitz.Page, row: fitz.Rect) -> fitz.Rect:
+    xs: list[float] = []
+    for drawing in page.get_drawings():
+        rect = drawing.get("rect")
+        if rect is None or rect.width >= 3:
+            continue
+        if abs(rect.y0 - row.y0) > 1.5 or abs(rect.y1 - row.y1) > 1.5:
+            continue
+        if TABLE_LEFT - 4 <= rect.x0 <= TABLE_RIGHT + 4:
+            xs.append(rect.x0)
+    columns = sorted(set(round(x, 2) for x in xs))
+    if len(columns) >= 2:
+        return fitz.Rect(columns[-2], row.y0, min(columns[-1] + 0.8, row.x1), row.y1)
+    width = min(84.0, max(row.width * 0.16, 60.0))
+    return fitz.Rect(row.x1 - width, row.y0, row.x1, row.y1)
+
+
+def _write_suspendido(page: fitz.Page, row: fitz.Rect) -> None:
+    cell = _firma_rect(page, row)
+    box = fitz.Rect(cell.x0 + 1, cell.y0 + 2, cell.x1 - 1.5, cell.y1 - 2)
+    if box.width < 20 or box.height < 8:
+        return
+    fontname = "helv"
+    if BOLD:
+        page.insert_font(fontname="sansb", fontfile=BOLD)
+        fontname = "sansb"
+    page.insert_textbox(
+        box,
+        SUSPENDIDO,
+        fontname=fontname,
+        fontsize=7.5,
+        color=(0, 0, 0),
+        align=fitz.TEXT_ALIGN_CENTER,
+    )
 
 
 def _page_clubs(document: fitz.Document) -> list[str | None]:

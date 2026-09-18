@@ -149,7 +149,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
             <p className="max-w-xl text-sm text-primary-foreground/80">
               El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
               El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada.
-              Pegá los suspendidos para marcarlos en celeste en la planilla de su equipo.
+              Pegá los suspendidos para marcar su fila en gris y escribir Suspendido en la firma.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -659,9 +659,9 @@ function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
   return (
     <div className="space-y-2">
       {found.length ? (
-        <Alert className="border-[#9fd6ea] bg-[#c8eaf6] text-[#1d4f63]">
+        <Alert className="border-neutral-400 bg-neutral-300 text-neutral-900">
           <CheckCircle2 />
-          <AlertTitle>Filas en celeste</AlertTitle>
+          <AlertTitle>Filas marcadas</AlertTitle>
           <AlertDescription>
             {found.map((item) => (
               <span key={`${item.name}-${item.team}`} className="block">

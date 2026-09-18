@@ -4,7 +4,7 @@ from pathlib import Path
 import pymupdf as fitz
 
 from processor.pipeline import ProcessOptions, analyze_document, generate_document
-from processor.players import apply_player_marks, parse_player_marks
+from processor.players import ROW_FILL, ROW_HEIGHT_MAX, ROW_HEIGHT_MIN, apply_player_marks, parse_player_marks
 
 
 def _roster_pdf(club: str, names: list[str]) -> bytes:
@@ -21,6 +21,19 @@ def _roster_pdf(club: str, names: list[str]) -> bytes:
     payload = document.tobytes()
     document.close()
     return payload
+
+
+def _has_marked_row(page: fitz.Page) -> bool:
+    for drawing in page.get_drawings():
+        fill = drawing.get("fill")
+        rect = drawing.get("rect")
+        if not fill or rect is None:
+            continue
+        if abs(fill[0] - ROW_FILL[0]) > 0.03:
+            continue
+        if rect.width > 400 and ROW_HEIGHT_MIN <= rect.height <= ROW_HEIGHT_MAX:
+            return True
+    return False
 
 
 def test_parse_player_marks_format():
@@ -68,9 +81,9 @@ def test_highlights_found_player_and_warns_missing():
     assert by_name["Nadie"].found is False
     assert "planilla de Equipo Inventado" in (by_name["Nadie"].warning or "")
     page = document[0]
-    annot = page.first_annot
-    assert annot is not None
-    assert "Highlight" in str(annot)
+    assert _has_marked_row(page)
+    assert page.first_annot is None
+    assert "Suspendido" in page.get_text("text")
     document.close()
 
 
@@ -94,9 +107,9 @@ Cancha 1
     assert any("Ezequiel Guzman" in warning for warning in summary["warnings"])
     output = fitz.open(stream=pdf_out, filetype="pdf")
     page = output[0]
-    annot = page.first_annot
-    assert annot is not None
-    assert "Highlight" in str(annot)
+    assert _has_marked_row(page)
+    assert page.first_annot is None
+    assert "Suspendido" in page.get_text("text")
     output.close()
 
 
@@ -134,5 +147,22 @@ def test_real_masivo_player_marks_if_present():
     assert "No encuentro a Ezequiel Guzman" in (marks["Ezequiel Guzman"]["warning"] or "")
     output = fitz.open(stream=pdf_out, filetype="pdf")
     page_index = (marks["Agustin Ferreyra"]["page"] or 1) - 1
-    assert output[page_index].first_annot is not None
+    page = output[page_index]
+    assert _has_marked_row(page)
+    assert page.first_annot is None
+    marked = [
+        drawing["rect"]
+        for drawing in page.get_drawings()
+        if drawing.get("fill")
+        and abs((drawing.get("fill") or (0, 0, 0))[0] - ROW_FILL[0]) < 0.03
+        and drawing["rect"].width > 400
+        and ROW_HEIGHT_MIN <= drawing["rect"].height <= ROW_HEIGHT_MAX
+    ]
+    assert marked
+    assert abs(marked[0].height - 22.5) < 0.2
+    hits = page.search_for("Suspendido")
+    assert hits
+    name_hits = page.search_for("Agustín Ferreyra") or page.search_for("Agustin Ferreyra")
+    assert name_hits
+    assert abs(hits[0].y0 - name_hits[0].y0) < 20
     output.close()
