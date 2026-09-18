@@ -44,6 +44,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 .lch-venv/
+.lch-output/
 dist/
 build/
 agent-tools/

@@ -77,7 +77,7 @@ export function renderAnalyzePage(
         <p>Leí el PDF contra el horario. Revisá qué se tira y después descargá el documento nuevo.</p>
         <div class="stats">
           <div><span>Hojas originales</span><strong>${summary.pageCount}</strong></div>
-          <div><span>Se conservan</span><strong>${summary.keptOriginalPages ?? summary.keptPages.length}</strong></div>
+          <div><span>Se conservan</span><strong>${summary.keptOriginalPages ?? summary.keptPages?.length ?? "—"}</strong></div>
           <div><span>Equipos a borrar</span><strong>${removed.length}</strong></div>
         </div>
         <h2>Equipos fuera de la jornada</h2>

@@ -1,8 +1,13 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { NextResponse } from "next/server";
 
 import { htmlResponse, renderErrorPage, wantsHtml } from "@/lib/form-html";
+import { OUTPUT_PDF_URL, outputPdfPath } from "@/lib/output-path";
 import { resolveUploadedPdf } from "@/lib/pdf-source";
 import { generatePdf } from "@/lib/run-processor";
+import { compactClientSummary } from "@/lib/summary";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -27,7 +32,19 @@ export async function POST(request: Request) {
       createMissing,
       matchDate: matchDate || undefined,
     });
-    const compact = compactSummary(result.summary);
+    const outPath = outputPdfPath();
+    await mkdir(path.dirname(outPath), { recursive: true });
+    await writeFile(outPath, result.pdf);
+    const compact = compactClientSummary(result.summary as Record<string, unknown>, {
+      downloadUrl: OUTPUT_PDF_URL,
+    });
+    const accept = (request.headers.get("accept") ?? "").toLowerCase();
+    if (html) {
+      return htmlResponse(renderDownloadPage(compact));
+    }
+    if (accept.includes("application/json") || !accept.includes("application/pdf")) {
+      return NextResponse.json(compact);
+    }
     const bytes = new Uint8Array(result.pdf);
     return new NextResponse(bytes, {
       headers: {
@@ -44,26 +61,17 @@ export async function POST(request: Request) {
   }
 }
 
-function compactSummary(summary: Record<string, unknown>) {
-  const schedule = (summary.schedule ?? {}) as Record<string, unknown>;
-  return {
-    ok: summary.ok,
-    pageCount: summary.pageCount,
-    outputPages: summary.outputPages,
-    keptOriginalPages: summary.keptOriginalPages,
-    createdPlanillas: summary.createdPlanillas,
-    matchDate: summary.matchDate,
-    removedTeams: summary.removedTeams,
-    unmatchedMatches: summary.unmatchedMatches,
-    warnings: summary.warnings,
-    keptPages: summary.keptPages,
-    removedPages: summary.removedPages,
-    schedule: {
-      matchCount: schedule.matchCount ?? 0,
-      teamCount: schedule.teamCount ?? 0,
-      errors: schedule.errors ?? [],
-      matches: [],
-      teams: [],
-    },
-  };
+function renderDownloadPage(summary: Record<string, unknown>) {
+  const downloadUrl = String(summary.downloadUrl ?? OUTPUT_PDF_URL);
+  return `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${downloadUrl}" />
+    <title>Planillas listas</title>
+  </head>
+  <body>
+    <p>PDF listo. Si no se baja solo, <a href="${downloadUrl}">tocá acá</a>.</p>
+  </body>
+</html>`;
 }

@@ -2,6 +2,8 @@
 
 Programa de **La Chacra Fútbol** para armar las planillas de cancha de una jornada.
 
+Repositorio: [HectorHalty/generador-de-planillas-lch](https://github.com/HectorHalty/generador-de-planillas-lch)
+
 A partir del PDF masivo y el horario por cancha:
 
 1. Completa **Día** (el sábado próximo), **Horario** y **Cancha N°**.
@@ -9,7 +11,7 @@ A partir del PDF masivo y el horario por cancha:
 3. Saca los que no están en el horario.
 4. **No** agrega las dos hojas de cruces ni la franja de margen.
 
-El horario de la jornada actual ya viene cargado, y el masivo también si está en `public/`.
+El horario de la jornada actual ya viene cargado, y el masivo también si está en `public/planillas-masivo.pdf`.
 
 ## Cómo usarlo (doble clic)
 
@@ -19,9 +21,10 @@ El horario de la jornada actual ya viene cargado, y el masivo también si está 
 2. Hacé **doble clic** en `Generador de Planillas LCH.bat` (también sirve `iniciar.bat`).
 3. La primera vez instala sola las librerías (un minuto). Después se abre el navegador.
 4. Tocá **Armar planillas**. Se descarga `planillas-cancha.pdf`.
-5. Dejá la ventana negra abierta mientras usás el programa. Cerrala para apagarlo.
+5. Si no se baja solo, tocá **Descargar PDF**.
+6. Dejá la ventana negra abierta mientras usás el programa. Cerrala para apagarlo.
 
-Si más adelante publicás este repo en GitHub, en **Actions** se puede bajar `GeneradorPlanillasLCH.exe` (un ejecutable de Windows, sin abrir el `.bat`).
+En GitHub **Actions → Build Windows executable** se puede bajar `GeneradorPlanillasLCH.exe`.
 
 ### macOS
 
@@ -31,9 +34,12 @@ Si más adelante publicás este repo en GitHub, en **Actions** se puede bajar `G
 ### Linux
 
 ```bash
+sudo apt install python3 python3-venv python3-pip   # Ubuntu/Debian
 chmod +x generador-de-planillas-lch.sh
 ./generador-de-planillas-lch.sh
 ```
+
+Variables opcionales: `LCH_PORT` (por defecto `43147`) y `LCH_HOST` (por defecto `0.0.0.0`).
 
 ## Cómo subir el PDF
 
@@ -75,14 +81,15 @@ También acepta markdown (`**Hombres:**`, `*Cancha 1*`).
 Hace falta Python 3.12+. Node es opcional (solo si usás la interfaz Next.js).
 
 ```bash
-python3 -m pip install -r requirements.txt
+python3 -m venv .lch-venv
+.lch-venv/bin/pip install -r requirements.txt
 python3 lanzar.py
 ```
 
 Pruebas:
 
 ```bash
-python3 -m pytest tests -q
+.lch-venv/bin/python -m pytest tests -q
 ```
 
 Motor en consola:
@@ -98,4 +105,13 @@ npm install
 npm run dev
 ```
 
+Ejecutable de Windows, con PyInstaller:
 
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+pyinstaller --noconfirm --clean packaging/generador.spec
+```
+
+## Licencia
+
+MIT. Uso interno de mesa de control de La Chacra Fútbol.

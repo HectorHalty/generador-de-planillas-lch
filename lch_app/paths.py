@@ -19,3 +19,13 @@ def static_dir() -> Path:
 
 def public_dir() -> Path:
     return app_root() / "public"
+
+
+def output_dir() -> Path:
+    path = app_root() / ".lch-output"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def output_pdf_path() -> Path:
+    return output_dir() / "planillas-cancha.pdf"

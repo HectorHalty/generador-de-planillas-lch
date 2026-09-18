@@ -3,11 +3,11 @@ from __future__ import annotations
 import html
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from lch_app.paths import public_dir, static_dir
+from lch_app.paths import output_pdf_path, public_dir, static_dir
 from processor.dates import format_sheet_date, next_saturday, parse_iso_date
 from processor.pipeline import ProcessOptions, analyze_document, generate_document
 from processor.sample import write_sample_pdf
@@ -25,7 +25,7 @@ def home() -> HTMLResponse:
     page = page.replace("__SCHEDULE__", html.escape(schedule))
     page = page.replace("__DATE__", next_saturday().isoformat())
     page = page.replace("__DATE_LABEL__", format_sheet_date(next_saturday()))
-    return HTMLResponse(page)
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/defaults")
@@ -51,13 +51,14 @@ async def analyze(
         payload = analyze_document(pdf_bytes, schedule)
         if not payload.get("ok"):
             return JSONResponse({"error": payload.get("error") or "No pude analizar el PDF."}, status_code=400)
-        return JSONResponse(payload)
+        return JSONResponse(_client_summary(payload))
     except Exception as error:  # noqa: BLE001
         return JSONResponse({"error": str(error)}, status_code=400)
 
 
 @app.post("/api/generate")
 async def generate(
+    request: Request,
     schedule: str = Form(""),
     source: str = Form("masivo"),
     sort: str = Form("category"),
@@ -75,26 +76,12 @@ async def generate(
             match_date=parse_iso_date(date) or next_saturday(),
         )
         pdf_out, summary = generate_document(pdf_bytes, schedule, options)
-        compact = {
-            "ok": summary.get("ok"),
-            "pageCount": summary.get("pageCount"),
-            "outputPages": summary.get("outputPages"),
-            "keptOriginalPages": summary.get("keptOriginalPages"),
-            "createdPlanillas": summary.get("createdPlanillas"),
-            "removedTeams": summary.get("removedTeams"),
-            "unmatchedMatches": summary.get("unmatchedMatches"),
-            "warnings": summary.get("warnings"),
-            "keptPages": summary.get("keptPages"),
-            "removedPages": summary.get("removedPages"),
-            "matchDate": summary.get("matchDate"),
-            "schedule": {
-                "matchCount": (summary.get("schedule") or {}).get("matchCount", 0),
-                "teamCount": (summary.get("schedule") or {}).get("teamCount", 0),
-                "errors": (summary.get("schedule") or {}).get("errors", []),
-                "matches": [],
-                "teams": [],
-            },
-        }
+        out = output_pdf_path()
+        out.write_bytes(pdf_out)
+        compact = _client_summary(summary, {"downloadUrl": "/api/output/planillas-cancha.pdf"})
+        accept = (request.headers.get("accept") or "").lower()
+        if "application/json" in accept or "application/pdf" not in accept:
+            return JSONResponse(compact)
         headers = {
             "Content-Disposition": 'attachment; filename="planillas-cancha.pdf"',
             "X-Planillero-Summary": _header_json(compact),
@@ -103,6 +90,22 @@ async def generate(
         return Response(content=pdf_out, media_type="application/pdf", headers=headers)
     except Exception as error:  # noqa: BLE001
         return JSONResponse({"error": str(error)}, status_code=400)
+
+
+@app.get("/api/output/planillas-cancha.pdf")
+def download_output() -> Response:
+    path = output_pdf_path()
+    if not path.exists():
+        return JSONResponse(
+            {"error": "Todavía no armé el PDF. Tocá Armar planillas."},
+            status_code=404,
+        )
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename="planillas-cancha.pdf",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/sample")
@@ -155,6 +158,28 @@ async def _resolve_pdf(upload: UploadFile | None, source: str, schedule: str) ->
     if source == "masivo":
         raise ValueError("No encuentro Planillas de Cancha - Masivo.pdf. Subilo con Elegir archivo.")
     raise ValueError("Subí un PDF: hacé clic en Elegir archivo o arrastralo.")
+
+
+def _client_summary(summary: dict, extra: dict | None = None) -> dict:
+    payload = {
+        "ok": summary.get("ok"),
+        "pageCount": summary.get("pageCount"),
+        "outputPages": summary.get("outputPages"),
+        "keptOriginalPages": summary.get("keptOriginalPages"),
+        "createdPlanillas": summary.get("createdPlanillas"),
+        "removedTeams": summary.get("removedTeams") or [],
+        "unmatchedMatches": summary.get("unmatchedMatches") or [],
+        "warnings": summary.get("warnings") or [],
+        "matchDate": summary.get("matchDate"),
+        "schedule": {
+            "matchCount": (summary.get("schedule") or {}).get("matchCount", 0),
+            "teamCount": (summary.get("schedule") or {}).get("teamCount", 0),
+            "errors": (summary.get("schedule") or {}).get("errors", []),
+        },
+    }
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 def _header_json(payload: dict) -> str:

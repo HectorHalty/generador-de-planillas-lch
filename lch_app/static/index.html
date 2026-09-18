@@ -104,9 +104,9 @@
     <form id="form" action="/api/generate" method="post" enctype="multipart/form-data">
       <div class="bar">
         <div class="wrap">
-          <button id="preview" type="submit" formaction="/api/analyze" name="intent" value="analyze">Previsualizar</button>
-          <button id="armar" class="primary" type="submit" formaction="/api/generate" name="intent" value="generate">Armar planillas</button>
-          <a id="again" class="btn" href="#" download="planillas-cancha.pdf" hidden>Descargar de nuevo</a>
+          <button id="preview" type="button">Previsualizar</button>
+          <button id="armar" class="primary" type="button">Armar planillas</button>
+          <a id="again" class="btn primary" href="/api/output/planillas-cancha.pdf" download="planillas-cancha.pdf" hidden>Descargar PDF</a>
           <span id="status" class="hint">Listo para armar</span>
         </div>
       </div>
@@ -186,7 +186,6 @@
       const scheduleEl = document.getElementById("schedule");
       const sourceEl = document.getElementById("source");
       const fileEl = document.getElementById("pdf-file");
-      let downloadUrl = null;
 
       function parseSchedule(text) {
         const matches = [];
@@ -287,15 +286,19 @@
         setSource("upload", file);
       });
 
-      form.addEventListener("submit", async (event) => {
-        const submitter = event.submitter;
-        const kind = submitter && submitter.value === "generate" ? "generate" : "analyze";
+      document.getElementById("preview").addEventListener("click", () => run("analyze"));
+      document.getElementById("armar").addEventListener("click", () => run("generate"));
+      form.addEventListener("submit", (event) => {
         event.preventDefault();
+        run("generate");
+      });
+
+      async function run(kind) {
         const errorBox = document.getElementById("error");
         errorBox.hidden = true;
         document.getElementById("preview").disabled = true;
         document.getElementById("armar").disabled = true;
-        document.getElementById("status").textContent = kind === "generate" ? "Armando el PDF…" : "Leyendo el PDF…";
+        document.getElementById("status").textContent = kind === "generate" ? "Armando el PDF… esperá unos segundos." : "Leyendo el PDF… esperá unos segundos.";
         try {
           const body = new FormData(form);
           if (kind === "analyze") {
@@ -303,34 +306,33 @@
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || "No pude analizar el PDF.");
             showSummary(payload);
+            document.getElementById("status").textContent = "Previsualización lista";
             return;
           }
-          const response = await fetch("/api/generate", { method: "POST", body, headers: { Accept: "application/pdf,application/json" } });
-          if (!response.ok) {
-            const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
-            throw new Error(payload.error || "No pude armar el PDF.");
-          }
-          const header = response.headers.get("X-Planillero-Summary");
-          if (header) showSummary(JSON.parse(decodeURIComponent(header)));
-          const blob = await response.blob();
-          if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-          downloadUrl = URL.createObjectURL(blob);
+          const response = await fetch("/api/generate", { method: "POST", body, headers: { Accept: "application/json" } });
+          const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
+          if (!response.ok) throw new Error(payload.error || "No pude armar el PDF.");
+          showSummary(payload);
+          const href = payload.downloadUrl || "/api/output/planillas-cancha.pdf";
           const again = document.getElementById("again");
-          again.href = downloadUrl;
+          again.href = href;
           again.hidden = false;
+          document.getElementById("status").textContent = "PDF listo. Si no se bajó solo, tocá Descargar PDF.";
           const link = document.createElement("a");
-          link.href = downloadUrl;
+          link.href = href;
           link.download = "planillas-cancha.pdf";
+          document.body.appendChild(link);
           link.click();
+          link.remove();
         } catch (err) {
           errorBox.hidden = false;
           errorBox.textContent = err.message || "Algo salió mal.";
+          document.getElementById("status").textContent = "No pude completar. Revisá el aviso rojo.";
         } finally {
           document.getElementById("preview").disabled = false;
           document.getElementById("armar").disabled = false;
-          document.getElementById("status").textContent = "Listo para armar";
         }
-      });
+      }
 
       function showSummary(payload) {
         document.getElementById("stat-removed").textContent = (payload.removedTeams || []).length;

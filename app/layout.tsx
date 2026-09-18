@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Fraunces, Outfit } from "next/font/google";
 
 import "./globals.css";
@@ -20,7 +21,11 @@ export const metadata: Metadata = {
     "Cargá el PDF masivo y el horario por cancha. El documento queda ordenado, con hora y cancha, y sin equipos de más.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
   return (
     <html
       lang="es"

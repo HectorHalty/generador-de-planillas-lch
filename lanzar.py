@@ -19,13 +19,14 @@ os.chdir(ROOT)
 VENV = ROOT / ".lch-venv"
 REQUIREMENTS = ROOT / "requirements.txt"
 PORT = int(os.environ.get("LCH_PORT", "43147"))
+HOST = os.environ.get("LCH_HOST", "0.0.0.0")
 URL = f"http://127.0.0.1:{PORT}"
 
 
 def main() -> int:
     if not getattr(sys, "frozen", False):
         python = _ensure_venv()
-        if Path(sys.executable).resolve() != python.resolve():
+        if Path(sys.prefix).resolve() != VENV.resolve():
             return subprocess.call([str(python), str(ROOT / "lanzar.py"), *sys.argv[1:]])
         _ensure_imports()
 
@@ -41,7 +42,7 @@ def main() -> int:
     threading.Thread(target=_open_browser, daemon=True).start()
     from lch_app.server import run
 
-    run(host="127.0.0.1", port=PORT)
+    run(host=HOST, port=PORT)
     return 0
 
 
@@ -53,7 +54,8 @@ def _venv_python() -> Path:
 
 def _ensure_venv() -> Path:
     python = _venv_python()
-    if not python.exists():
+    pip = python.parent / ("pip.exe" if os.name == "nt" else "pip")
+    if not python.exists() or not pip.exists():
         print("Preparando el entorno la primera vez. Puede tardar un minuto…")
         subprocess.check_call([sys.executable, "-m", "venv", str(VENV)])
     return python

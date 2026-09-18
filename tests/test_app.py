@@ -18,6 +18,26 @@ def test_home_renders_brand():
     assert response.status_code == 200
     assert "Generador de Planillas LCH" in response.text
     assert "Día de la jornada" in response.text
+    assert "Descargar PDF" in response.text
+
+
+def test_analyze_returns_compact_json():
+    schedule = """
+Hombres:
+
+Cancha 1
+11:30: Mambo F.C. vs Echale Pesteke
+"""
+    response = client.post(
+        "/api/analyze",
+        data={"schedule": schedule, "source": "ejemplo"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert "keptPages" not in payload
+    assert "removedPages" not in payload
+    assert isinstance(payload["removedTeams"], list)
 
 
 def test_generate_ejemplo_without_index():
@@ -39,8 +59,12 @@ Cancha 1
         },
     )
     assert response.status_code == 200, response.text
-    assert response.headers["content-type"].startswith("application/pdf")
-    assert response.content[:4] == b"%PDF"
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["downloadUrl"] == "/api/output/planillas-cancha.pdf"
+    download = client.get(payload["downloadUrl"])
+    assert download.status_code == 200
+    assert download.content[:4] == b"%PDF"
 
 
 def test_direct_generate_has_saturday_and_no_footer():

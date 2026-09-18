@@ -57,7 +57,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
 
   useEffect(() => {
     return () => {
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
 
@@ -76,10 +76,8 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
     setSummary(null);
     setError(null);
     if (!next && inputRef.current) inputRef.current.value = "";
-    if (downloadUrl) {
-      URL.revokeObjectURL(downloadUrl);
-      setDownloadUrl(null);
-    }
+    if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
+    setDownloadUrl(null);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -120,24 +118,22 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       const response = await fetch("/api/generate", {
         method: "POST",
         body: form,
-        headers: { Accept: "application/pdf,application/json" },
+        headers: { Accept: "application/json" },
       });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
-        throw new Error(payload.error || "No pude armar el PDF.");
-      }
-      const header = response.headers.get("X-Planillero-Summary");
-      if (header) {
-        setSummary(JSON.parse(decodeURIComponent(header)) as ProcessSummary);
-      }
-      const blob = await response.blob();
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
+      const payload = (await response.json().catch(() => ({ error: "No pude armar el PDF." }))) as ProcessSummary & {
+        error?: string;
+      };
+      if (!response.ok) throw new Error(payload.error || "No pude armar el PDF.");
+      setSummary(payload);
+      const href = payload.downloadUrl || "/api/output/planillas-cancha.pdf";
+      if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
+      setDownloadUrl(href);
       const link = document.createElement("a");
-      link.href = url;
+      link.href = href;
       link.download = "planillas-cancha.pdf";
+      document.body.appendChild(link);
       link.click();
+      link.remove();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Algo salió mal.");
     } finally {
@@ -166,7 +162,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
             <StatChip
               icon={Trash2}
               label="A borrar"
-              value={summary?.removedTeams.length ?? "—"}
+              value={summary?.removedTeams?.length ?? "—"}
             />
           </div>
         </div>
@@ -212,7 +208,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
                 href={downloadUrl}
                 download="planillas-cancha.pdf"
               >
-                Descargar de nuevo
+                Descargar PDF
               </a>
             ) : null}
             {busy ? (
@@ -472,7 +468,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
                       href={downloadUrl}
                       download="planillas-cancha.pdf"
                     >
-                      Descargar de nuevo
+                      Descargar PDF
                     </a>
                   ) : null}
                 </div>
@@ -609,14 +605,14 @@ function StatChip({
 }
 
 function SummaryPanel({ summary }: { summary: ProcessSummary }) {
-  const dropped = summary.removedPages.filter((page) =>
+  const dropped = (summary.removedPages ?? []).filter((page) =>
     page.reason.toLowerCase().includes("fuera"),
   );
   return (
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-3">
-        <MiniStat label="Hojas originales" value={summary.pageCount} />
-        <MiniStat label="Se conservan" value={summary.keptOriginalPages ?? summary.keptPages.length} />
+        <MiniStat label="Hojas originales" value={summary.pageCount ?? "—"} />
+        <MiniStat label="Se conservan" value={summary.keptOriginalPages ?? summary.keptPages?.length ?? "—"} />
         <MiniStat label="PDF final" value={summary.outputPages ?? "—"} />
       </div>
       {summary.matchDate ? (
@@ -624,7 +620,7 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
           Día completado: <span className="font-medium">{summary.matchDate}</span>
         </p>
       ) : null}
-      {summary.removedTeams.length ? (
+      {summary.removedTeams?.length ? (
         <Alert variant="destructive">
           <Trash2 />
           <AlertTitle>Equipos fuera de la jornada</AlertTitle>
@@ -647,7 +643,7 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
           juegan.
         </p>
       ) : null}
-      {summary.unmatchedMatches.length ? (
+      {summary.unmatchedMatches?.length ? (
         <p className="text-sm">
           {summary.unmatchedMatches.length} partido
           {summary.unmatchedMatches.length === 1 ? "" : "s"} no estaban en el PDF original y
@@ -656,7 +652,7 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
             : " quedaron pendientes."}
         </p>
       ) : null}
-      {summary.warnings.length ? (
+      {summary.warnings?.length ? (
         <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm">
           {summary.warnings.map((warning) => (
             <li key={warning}>{warning}</li>

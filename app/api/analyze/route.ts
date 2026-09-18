@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { htmlResponse, renderAnalyzePage, renderErrorPage, wantsHtml } from "@/lib/form-html";
 import { resolveUploadedPdf } from "@/lib/pdf-source";
 import { analyzePdf } from "@/lib/run-processor";
+import { compactClientSummary } from "@/lib/summary";
 import type { ProcessSummary } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -21,12 +22,13 @@ export async function POST(request: Request) {
     const file = form.get("pdf");
     const pdf = await resolveUploadedPdf(file, source, schedule);
     const payload = (await analyzePdf(pdf, schedule)) as ProcessSummary;
+    const compact = compactClientSummary(payload as unknown as Record<string, unknown>) as ProcessSummary;
     if (html) {
       return htmlResponse(
-        renderAnalyzePage(payload, { schedule, source, sort, index, blanks, date }),
+        renderAnalyzePage(compact, { schedule, source, sort, index, blanks, date }),
       );
     }
-    return NextResponse.json(payload);
+    return NextResponse.json(compact);
   } catch (error) {
     const message = error instanceof Error ? error.message : "No pude analizar el documento.";
     if (html) return htmlResponse(renderErrorPage(message), 400);
