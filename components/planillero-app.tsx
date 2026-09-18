@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { MatchInfo, ProcessSummary, SchedulePayload } from "@/lib/types";
+import { parseSchedule } from "@/lib/parse-schedule";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -37,34 +38,19 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
   const [sortMode, setSortMode] = useState<"category" | "court">("category");
   const [includeIndex, setIncludeIndex] = useState(true);
   const [createMissing, setCreateMissing] = useState(true);
-  const [parsed, setParsed] = useState<SchedulePayload | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<SchedulePayload>(() => parseSchedule(defaultSchedule));
+  const [parseError, setParseError] = useState<string | null>(
+    () => parseSchedule(defaultSchedule).errors[0] ?? null,
+  );
   const [busy, setBusy] = useState<"analyze" | "generate" | null>(null);
   const [summary, setSummary] = useState<ProcessSummary | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handle = window.setTimeout(async () => {
-      try {
-        const response = await fetch("/api/parse", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ schedule }),
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          setParseError(payload.error || "No pude leer el horario.");
-          setParsed(null);
-          return;
-        }
-        setParsed(payload as SchedulePayload);
-        setParseError(payload.errors?.[0] ?? null);
-      } catch (caught) {
-        setParseError(caught instanceof Error ? caught.message : "No pude leer el horario.");
-      }
-    }, 280);
-    return () => window.clearTimeout(handle);
+    const next = parseSchedule(schedule);
+    setParsed(next);
+    setParseError(next.errors[0] ?? null);
   }, [schedule]);
 
   useEffect(() => {
@@ -73,7 +59,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
     };
   }, [downloadUrl]);
 
-  const grouped = useMemo(() => groupMatches(parsed?.matches ?? []), [parsed]);
+  const grouped = useMemo(() => groupMatches(parsed.matches), [parsed]);
   const sourceLabel =
     file?.name ??
     (source === "masivo"
@@ -97,6 +83,9 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
     setBusy(kind);
     setError(null);
     try {
+      if (!parsed.matchCount) {
+        throw new Error("El horario no tiene partidos. Revisá el texto de canchas y horarios.");
+      }
       const form = new FormData();
       form.set("schedule", schedule);
       form.set("source", file ? "upload" : source);
@@ -152,8 +141,8 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <StatChip icon={Users} label="Partidos" value={parsed?.matchCount ?? "—"} />
-            <StatChip icon={MapPinned} label="Equipos" value={parsed?.teamCount ?? "—"} />
+            <StatChip icon={Users} label="Partidos" value={parsed.matchCount || "—"} />
+            <StatChip icon={MapPinned} label="Equipos" value={parsed.teamCount || "—"} />
             <StatChip
               icon={Trash2}
               label="A borrar"
@@ -283,7 +272,9 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                   <p className="text-destructive text-sm">{parseError}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    {parsed ? `${parsed.matchCount} partidos listos` : "Leyendo horario…"}
+                    {parsed.matchCount
+                      ? `${parsed.matchCount} partidos listos`
+                      : "Leyendo horario…"}
                   </p>
                 )}
               </div>
@@ -342,9 +333,10 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <button
+                  id="preview-planillas"
                   type="button"
-                  variant="outline"
+                  className={cn(buttonVariants({ variant: "outline", size: "lg" }), "min-h-11 px-4")}
                   disabled={busy !== null}
                   onClick={() => void submit("analyze")}
                 >
@@ -353,12 +345,13 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                   ) : (
                     <Users data-icon="inline-start" />
                   )}
-                  Previsualizar
-                </Button>
-                <Button
+                  {busy === "analyze" ? "Leyendo el PDF…" : "Previsualizar"}
+                </button>
+                <button
+                  id="armar-planillas"
                   type="button"
-                  size="lg"
-                  disabled={busy !== null || !parsed?.matchCount}
+                  className={cn(buttonVariants({ size: "lg" }), "min-h-11 px-4")}
+                  disabled={busy !== null}
                   onClick={() => void submit("generate")}
                 >
                   {busy === "generate" ? (
@@ -366,8 +359,8 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                   ) : (
                     <Download data-icon="inline-start" />
                   )}
-                  Armar planillas
-                </Button>
+                  {busy === "generate" ? "Armando el PDF…" : "Armar planillas"}
+                </button>
                 {downloadUrl ? (
                   <a
                     className={cn(buttonVariants({ variant: "secondary" }))}
@@ -378,7 +371,13 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                   </a>
                 ) : null}
               </div>
-              {error ? (
+              {busy ? (
+                <p className="rounded-lg bg-secondary px-3 py-2 text-sm">
+                  {busy === "analyze"
+                    ? "Estoy leyendo las planillas. Puede tardar unos segundos."
+                    : "Estoy armando el PDF nuevo. No cierres esta pestaña."}
+                </p>
+              ) : null}
                 <Alert variant="destructive">
                   <AlertTriangle />
                   <AlertTitle>No se pudo armar el documento</AlertTitle>
@@ -397,7 +396,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
               <CardDescription>Orden de impresión según el horario cargado.</CardDescription>
             </CardHeader>
             <CardContent>
-              {parsed?.matches.length ? (
+              {parsed.matches.length ? (
                 <ScrollArea className="h-[min(70vh,640px)] pr-3">
                   <div className="space-y-5">
                     {grouped.map((group) => (
