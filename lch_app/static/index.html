@@ -345,6 +345,107 @@
         run("generate");
       });
 
+      const LOCAL_API = "http://127.0.0.1:43147";
+
+      function isNetworkFailure(err) {
+        const msg = String(err && err.message ? err.message : err || "");
+        if (err && err.name === "TypeError") return true;
+        return /failed to fetch|networkerror|load failed/i.test(msg);
+      }
+
+      function describeNetworkError(err) {
+        if (err && err.name === "AbortError") {
+          return "Tardó demasiado. Dejá la ventana abierta y volvé a tocar Armar planillas.";
+        }
+        if (isNetworkFailure(err)) {
+          return "No pude hablar con el generador. Dejá abierta la ventana negra del programa y recargá esta página. Si estás en una vista previa, abrí " + LOCAL_API + " en el navegador.";
+        }
+        return (err && err.message) || "Algo salió mal.";
+      }
+
+      function apiBases() {
+        const here = (window.location.origin || "").replace(/\/$/, "");
+        const bases = [here];
+        if (here !== LOCAL_API) bases.push(LOCAL_API);
+        return bases;
+      }
+
+      function requestPayload() {
+        const file = fileEl.files && fileEl.files[0];
+        return {
+          file: file && file.size ? file : null,
+          fields: {
+            schedule: scheduleEl.value,
+            source: file && file.size ? "upload" : (sourceEl.value || "masivo"),
+            sort: document.getElementById("sort").value,
+            date: document.getElementById("date").value,
+            players: playersEl.value,
+            index: "0",
+            blanks: "0",
+          },
+        };
+      }
+
+      async function postOnce(url, fields, file) {
+        const controller = new AbortController();
+        const timer = setTimeout(function () { controller.abort(); }, 180000);
+        try {
+          const headers = { Accept: "application/json" };
+          let body;
+          if (file) {
+            body = new FormData();
+            Object.keys(fields).forEach(function (key) { body.set(key, fields[key]); });
+            body.set("pdf", file);
+          } else {
+            headers["Content-Type"] = "application/json";
+            body = JSON.stringify(fields);
+          }
+          const response = await fetch(url, {
+            method: "POST",
+            body: body,
+            headers: headers,
+            signal: controller.signal,
+            cache: "no-store",
+          });
+          const payload = await response.json().catch(function () { return null; });
+          if (!payload) throw new TypeError("Failed to fetch");
+          if (!response.ok) throw new Error(payload.error || "No pude completar el pedido.");
+          return payload;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function apiPost(path) {
+        const req = requestPayload();
+        let last = null;
+        const bases = apiBases();
+        for (let i = 0; i < bases.length; i++) {
+          try {
+            return await postOnce(bases[i] + path, req.fields, req.file);
+          } catch (err) {
+            last = err;
+            if (!isNetworkFailure(err)) throw err;
+          }
+        }
+        throw new Error(describeNetworkError(last));
+      }
+
+      async function pingHealth() {
+        try {
+          const response = await fetch("/api/health", { cache: "no-store" });
+          if (response.ok) return;
+        } catch (_err) {}
+        try {
+          const response = await fetch(LOCAL_API + "/api/health", { cache: "no-store" });
+          if (response.ok) return;
+        } catch (_err) {}
+        const errorBox = document.getElementById("error");
+        errorBox.hidden = false;
+        errorBox.textContent = "No pude hablar con el generador. Dejá abierta la ventana negra del programa y recargá esta página. Si estás en una vista previa, abrí " + LOCAL_API + " en el navegador.";
+        document.getElementById("status").textContent = "Sin conexión con el generador.";
+      }
+
       async function run(kind) {
         const errorBox = document.getElementById("error");
         errorBox.hidden = true;
@@ -352,19 +453,12 @@
         document.getElementById("armar").disabled = true;
         document.getElementById("status").textContent = kind === "generate" ? "Armando el PDF… esperá unos segundos." : "Leyendo el PDF… esperá unos segundos.";
         try {
-          const body = new FormData(form);
+          const payload = await apiPost(kind === "analyze" ? "/api/analyze" : "/api/generate");
+          showSummary(payload);
           if (kind === "analyze") {
-            const response = await fetch("/api/analyze", { method: "POST", body, headers: { Accept: "application/json" } });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || "No pude analizar el PDF.");
-            showSummary(payload);
             document.getElementById("status").textContent = "Previsualización lista";
             return;
           }
-          const response = await fetch("/api/generate", { method: "POST", body, headers: { Accept: "application/json" } });
-          const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
-          if (!response.ok) throw new Error(payload.error || "No pude armar el PDF.");
-          showSummary(payload);
           const href = payload.downloadUrl || "/api/output/planillas-cancha.pdf";
           const again = document.getElementById("again");
           again.href = href;
@@ -378,7 +472,7 @@
           link.remove();
         } catch (err) {
           errorBox.hidden = false;
-          errorBox.textContent = err.message || "Algo salió mal.";
+          errorBox.textContent = describeNetworkError(err);
           document.getElementById("status").textContent = "No pude completar. Revisá el aviso rojo.";
         } finally {
           document.getElementById("preview").disabled = false;
@@ -421,6 +515,7 @@
 
       render();
       renderPlayers();
+      pingHealth();
     </script>
   </body>
 </html>

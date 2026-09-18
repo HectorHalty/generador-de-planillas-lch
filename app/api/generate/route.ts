@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { htmlResponse, renderErrorPage, wantsHtml } from "@/lib/form-html";
 import { OUTPUT_PDF_URL, outputPdfPath } from "@/lib/output-path";
 import { resolveUploadedPdf } from "@/lib/pdf-source";
+import { readProcessRequest } from "@/lib/read-process-request";
 import { generatePdf } from "@/lib/run-processor";
 import { compactClientSummary } from "@/lib/summary";
 
@@ -15,16 +16,15 @@ export const maxDuration = 120;
 export async function POST(request: Request) {
   const html = wantsHtml(request);
   try {
-    const form = await request.formData();
-    const schedule = String(form.get("schedule") ?? "");
-    const source = String(form.get("source") ?? (form.get("sample") === "1" ? "ejemplo" : "masivo"));
-    const sort = String(form.get("sort") ?? "category") === "court" ? "court" : "category";
+    const fields = await readProcessRequest(request);
+    const schedule = fields.schedule;
+    const source = fields.source;
+    const sort = fields.sort === "court" ? "court" : "category";
     const includeIndex = false;
     const createMissing = false;
-    const matchDate = String(form.get("date") ?? "").trim();
-    const players = String(form.get("players") ?? "");
-    const file = form.get("pdf");
-    const pdf = await resolveUploadedPdf(file, source, schedule);
+    const matchDate = fields.date.trim();
+    const players = fields.players;
+    const pdf = await resolveUploadedPdf(fields.file, source, schedule);
     const result = await generatePdf({
       pdf,
       schedule,

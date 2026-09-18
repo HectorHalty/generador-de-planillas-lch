@@ -33,6 +33,87 @@ def test_home_renders_brand():
     assert "Equipos fuera de la jornada" not in response.text
     assert "Filas en celeste" not in response.text
     assert "No están en la planilla" not in response.text
+    assert "application/json" in response.text
+    assert "No pude hablar con el generador" in response.text
+    assert "new FormData(form)" not in response.text
+
+
+def test_health_ok():
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_analyze_accepts_json_and_cors():
+    schedule = """
+Hombres:
+
+Cancha 1
+11:30: Mambo F.C. vs Echale Pesteke
+"""
+    response = client.post(
+        "/api/analyze",
+        json={"schedule": schedule, "source": "ejemplo", "players": "Ezequiel Guzman (Mimetizarte)"},
+        headers={"Origin": "http://localhost:3000", "Accept": "application/json"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers.get("access-control-allow-origin") == "*"
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["playerMarks"]
+
+
+def test_generate_accepts_json():
+    schedule = """
+Hombres:
+
+Cancha 1
+11:30: Mambo F.C. vs Echale Pesteke
+"""
+    response = client.post(
+        "/api/generate",
+        json={
+            "schedule": schedule,
+            "source": "ejemplo",
+            "sort": "category",
+            "date": "2026-09-19",
+        },
+        headers={"Accept": "application/json", "Origin": "http://127.0.0.1:4173"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["downloadUrl"] == "/api/output/planillas-cancha.pdf"
+    assert response.headers.get("access-control-allow-origin") == "*"
+
+
+def test_cors_preflight_generate():
+    response = client.options(
+        "/api/generate",
+        headers={
+            "Origin": "http://example.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,accept",
+        },
+    )
+    assert response.status_code in {200, 204}
+    assert response.headers.get("access-control-allow-origin") == "*"
+
+
+def test_analyze_ignores_empty_pdf_file():
+    schedule = """
+Hombres:
+
+Cancha 1
+11:30: Mambo F.C. vs Echale Pesteke
+"""
+    response = client.post(
+        "/api/analyze",
+        data={"schedule": schedule, "source": "ejemplo"},
+        files={"pdf": ("", b"", "application/octet-stream")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["ok"] is True
 
 
 def test_analyze_returns_compact_json():

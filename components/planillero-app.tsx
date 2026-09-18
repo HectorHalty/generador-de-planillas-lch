@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { describeNetworkError, postProcess } from "@/lib/api-client";
 import type { MatchInfo, PlayerMark, ProcessSummary, SchedulePayload } from "@/lib/types";
 import { parsePlayers } from "@/lib/parse-players";
 import { parseSchedule } from "@/lib/parse-schedule";
@@ -91,37 +92,25 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       if (!parsed.matchCount) {
         throw new Error("El horario no tiene partidos. Revisá el texto de canchas y horarios.");
       }
-      const form = new FormData();
-      form.set("schedule", schedule);
-      form.set("source", file ? "upload" : source);
-      form.set("sort", sortMode);
-      form.set("date", matchDate);
-      form.set("players", playersText);
-      if (file) form.set("pdf", file);
+      const payload = {
+        schedule,
+        source: file ? "upload" : source,
+        sort: sortMode,
+        date: matchDate,
+        players: playersText,
+      };
 
       if (kind === "analyze") {
-        const response = await fetch("/api/analyze", {
-          method: "POST",
-          body: form,
-          headers: { Accept: "application/json" },
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "No pude analizar el PDF.");
-        setSummary(payload as ProcessSummary);
+        const result = await postProcess("/api/analyze", payload, file);
+        setSummary(result as ProcessSummary);
         return;
       }
 
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        body: form,
-        headers: { Accept: "application/json" },
-      });
-      const payload = (await response.json().catch(() => ({ error: "No pude armar el PDF." }))) as ProcessSummary & {
-        error?: string;
+      const result = (await postProcess("/api/generate", payload, file)) as ProcessSummary & {
+        downloadUrl?: string;
       };
-      if (!response.ok) throw new Error(payload.error || "No pude armar el PDF.");
-      setSummary(payload);
-      const href = payload.downloadUrl || "/api/output/planillas-cancha.pdf";
+      setSummary(result);
+      const href = result.downloadUrl || "/api/output/planillas-cancha.pdf";
       if (downloadUrl?.startsWith("blob:")) URL.revokeObjectURL(downloadUrl);
       setDownloadUrl(href);
       const link = document.createElement("a");
@@ -131,7 +120,7 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
       link.click();
       link.remove();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Algo salió mal.");
+      setError(describeNetworkError(caught));
     } finally {
       setBusy(null);
     }

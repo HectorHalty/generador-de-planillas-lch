@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { htmlResponse, renderAnalyzePage, renderErrorPage, wantsHtml } from "@/lib/form-html";
 import { resolveUploadedPdf } from "@/lib/pdf-source";
+import { readProcessRequest } from "@/lib/read-process-request";
 import { analyzePdf } from "@/lib/run-processor";
 import { compactClientSummary } from "@/lib/summary";
 import type { ProcessSummary } from "@/lib/types";
@@ -12,13 +13,8 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   const html = wantsHtml(request);
   try {
-    const form = await request.formData();
-    const schedule = String(form.get("schedule") ?? "");
-    const source = String(form.get("source") ?? (form.get("sample") === "1" ? "ejemplo" : "masivo"));
-    const sort = String(form.get("sort") ?? "category");
-    const date = String(form.get("date") ?? "");
-    const players = String(form.get("players") ?? "");
-    const file = form.get("pdf");
+    const fields = await readProcessRequest(request);
+    const { schedule, source, sort, date, players, file } = fields;
     const pdf = await resolveUploadedPdf(file, source, schedule);
     const payload = (await analyzePdf(pdf, schedule, players)) as ProcessSummary;
     const compact = compactClientSummary(payload as unknown as Record<string, unknown>) as ProcessSummary;

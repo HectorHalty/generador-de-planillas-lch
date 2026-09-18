@@ -41,6 +41,8 @@ chmod +x generador-de-planillas-lch.sh
 
 Variables opcionales: `LCH_PORT` (por defecto `43147`) y `LCH_HOST` (por defecto `0.0.0.0`).
 
+Si el navegador dice **Failed to fetch** o no puede hablar con el generador, abrí directo `http://127.0.0.1:43147` y dejá abierta la ventana negra de `lanzar.py`.
+
 ## Cómo subir el PDF
 
 El masivo de la jornada puede ir ya en `public/planillas-masivo.pdf`. Si querés cargar otro:

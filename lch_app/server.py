@@ -3,9 +3,11 @@ from __future__ import annotations
 import html
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from lch_app.paths import output_pdf_path, public_dir, static_dir
 from processor.dates import format_sheet_date, next_saturday, parse_iso_date
@@ -14,6 +16,13 @@ from processor.players import parse_player_marks
 from processor.sample import write_sample_pdf
 
 app = FastAPI(title="Generador de Planillas LCH")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition", "X-Planillero-Summary"],
+)
 STATIC = static_dir()
 if STATIC.exists():
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -41,14 +50,18 @@ def defaults() -> dict:
     }
 
 
+@app.get("/api/health")
+def health() -> dict:
+    return {"ok": True, "hasMasivo": (public_dir() / "planillas-masivo.pdf").exists()}
+
+
 @app.post("/api/analyze")
-async def analyze(
-    schedule: str = Form(""),
-    source: str = Form("masivo"),
-    players: str = Form(""),
-    pdf: UploadFile | None = File(None),
-) -> JSONResponse:
+async def analyze(request: Request) -> JSONResponse:
     try:
+        fields, pdf = await _read_request_fields(request)
+        schedule = fields.get("schedule", "")
+        source = fields.get("source", "masivo") or "masivo"
+        players = fields.get("players", "")
         pdf_bytes = await _resolve_pdf(pdf, source, schedule)
         marked, parse_errors = parse_player_marks(players)
         payload = analyze_document(pdf_bytes, schedule, players=marked)
@@ -62,18 +75,14 @@ async def analyze(
 
 
 @app.post("/api/generate")
-async def generate(
-    request: Request,
-    schedule: str = Form(""),
-    source: str = Form("masivo"),
-    sort: str = Form("category"),
-    index: str = Form("0"),
-    blanks: str = Form("1"),
-    date: str = Form(""),
-    players: str = Form(""),
-    pdf: UploadFile | None = File(None),
-) -> Response:
+async def generate(request: Request) -> Response:
     try:
+        fields, pdf = await _read_request_fields(request)
+        schedule = fields.get("schedule", "")
+        source = fields.get("source", "masivo") or "masivo"
+        sort = fields.get("sort", "category")
+        date = fields.get("date", "")
+        players = fields.get("players", "")
         pdf_bytes = await _resolve_pdf(pdf, source, schedule)
         marked, parse_errors = parse_player_marks(players)
         options = ProcessOptions(
@@ -144,6 +153,34 @@ def _default_schedule() -> str:
     return "Hombres:\n\nCancha 1\n11:30: Local vs Visitante\n"
 
 
+async def _read_request_fields(request: Request) -> tuple[dict[str, str], UploadFile | None]:
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/json" in content_type:
+        try:
+            raw = await request.json()
+        except Exception as error:  # noqa: BLE001
+            raise ValueError("No pude leer el pedido. Recargá la página e intentá de nuevo.") from error
+        if not isinstance(raw, dict):
+            raise ValueError("El pedido JSON tiene que ser un objeto.")
+        fields = {str(key): "" if value is None else str(value) for key, value in raw.items()}
+        return fields, None
+
+    try:
+        form = await request.form()
+    except Exception as error:  # noqa: BLE001
+        raise ValueError("No pude leer el formulario. Recargá la página e intentá de nuevo.") from error
+
+    upload: UploadFile | None = None
+    fields: dict[str, str] = {}
+    for key, value in form.multi_items():
+        if isinstance(value, (UploadFile, StarletteUploadFile)):
+            if key == "pdf" and getattr(value, "filename", None):
+                upload = value
+            continue
+        fields[str(key)] = str(value)
+    return fields, upload
+
+
 async def _resolve_pdf(upload: UploadFile | None, source: str, schedule: str) -> bytes:
     if upload is not None and upload.filename:
         data = await upload.read()
@@ -203,4 +240,11 @@ def _header_json(payload: dict) -> str:
 def run(host: str = "127.0.0.1", port: int = 43147) -> None:
     import uvicorn
 
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        timeout_keep_alive=120,
+        timeout_graceful_shutdown=10,
+    )
