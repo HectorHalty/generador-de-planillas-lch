@@ -7,6 +7,7 @@ from processor.names import find_teams_in_text, names_equivalent
 from processor.schedule import Match
 
 VS_RE = re.compile(r"(.+?)\s+vs\.?\s+(.+)", re.IGNORECASE)
+CLUB_RE = re.compile(r"Club:\s*(.+)$", re.IGNORECASE)
 SIDE_LABELS = {"local", "visitante", "equipo local", "equipo visitante", "equipo"}
 
 
@@ -45,6 +46,17 @@ class AssignmentResult:
         }
 
 
+def extract_club(text: str) -> str | None:
+    for raw in (text or "").splitlines():
+        line = raw.replace("\xa0", " ").strip()
+        hit = CLUB_RE.search(line)
+        if hit:
+            name = re.sub(r"\s+", " ", hit.group(1)).strip(" |")
+            if name:
+                return name
+    return None
+
+
 def extract_named_sides(text: str) -> list[str]:
     names: list[str] = []
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
@@ -64,6 +76,123 @@ def extract_named_sides(text: str) -> list[str]:
     return _unique_teams(names)
 
 
+def assign_pages(
+    page_texts: list[str],
+    matches: list[Match],
+) -> AssignmentResult:
+    if any(extract_club(text) for text in page_texts):
+        return _assign_club_sheets(page_texts, matches)
+    return _assign_match_sheets(page_texts, matches)
+
+
+def _scheduled_name(name: str, scheduled: list[str]) -> str | None:
+    for team in scheduled:
+        if names_equivalent(name, team):
+            return team
+    return None
+
+
+def _assign_club_sheets(
+    page_texts: list[str],
+    matches: list[Match],
+) -> AssignmentResult:
+    scheduled_teams = [team for match in matches for team in match.teams]
+    groups: list[dict] = []
+    current: dict | None = None
+
+    for index, text in enumerate(page_texts):
+        club = extract_club(text)
+        if club:
+            current = {
+                "club": club,
+                "scheduled": _scheduled_name(club, scheduled_teams),
+                "pages": [index],
+            }
+            groups.append(current)
+        elif current is not None:
+            current["pages"].append(index)
+
+    team_pages: dict[str, list[int]] = {}
+    leftover: list[str] = []
+    keep_indexes: dict[int, tuple[int, str]] = {}
+
+    for group in groups:
+        scheduled = group["scheduled"]
+        if scheduled:
+            team_pages[scheduled] = group["pages"]
+            match = next(
+                item
+                for item in matches
+                if names_equivalent(scheduled, item.home) or names_equivalent(scheduled, item.away)
+            )
+            reason = f"Cancha {match.court} · {match.time} · {match.category}"
+            for page_index in group["pages"]:
+                keep_indexes[page_index] = (match.id, reason)
+        else:
+            leftover.append(group["club"])
+
+    match_pages: dict[int, list[int]] = {match.id: [] for match in matches}
+    for match in matches:
+        match_pages[match.id] = [
+            *team_pages.get(match.home, []),
+            *team_pages.get(match.away, []),
+        ]
+
+    pages: list[PageAnalysis] = []
+    for index, text in enumerate(page_texts):
+        kept = keep_indexes.get(index)
+        club = extract_club(text)
+        if kept:
+            match_id, reason = kept
+            matched = []
+            for match in matches:
+                if match.id == match_id:
+                    club_name = club or next(
+                        (
+                            team
+                            for team, indexes in team_pages.items()
+                            if index in indexes
+                        ),
+                        "",
+                    )
+                    matched = [club_name] if club_name else []
+                    break
+            pages.append(
+                PageAnalysis(
+                    index=index,
+                    text=text[:4000],
+                    matched_teams=matched,
+                    extra_teams=[],
+                    kind="team" if club else "continuation",
+                    match_id=match_id,
+                    action="keep",
+                    reason=reason,
+                )
+            )
+        else:
+            extra = [club] if club and not _scheduled_name(club, scheduled_teams) else []
+            pages.append(
+                PageAnalysis(
+                    index=index,
+                    text=text[:4000],
+                    matched_teams=[],
+                    extra_teams=extra,
+                    kind="team" if club else "continuation",
+                    match_id=None,
+                    action="drop",
+                    reason="Equipos fuera de este horario" if extra or not club else "Sin equipos de este horario",
+                )
+            )
+
+    unmatched = [match.id for match in matches if not match_pages[match.id]]
+    return AssignmentResult(
+        pages=pages,
+        match_pages=match_pages,
+        removed_teams=sorted(_unique_teams(leftover)),
+        unmatched_matches=unmatched,
+    )
+
+
 def _match_for_teams(teams: list[str], matches: list[Match]) -> Match | None:
     if not teams:
         return None
@@ -79,7 +208,7 @@ def _match_for_teams(teams: list[str], matches: list[Match]) -> Match | None:
     return None
 
 
-def assign_pages(
+def _assign_match_sheets(
     page_texts: list[str],
     matches: list[Match],
 ) -> AssignmentResult:
@@ -156,11 +285,7 @@ def assign_pages(
             "El PDF no tiene texto seleccionable. Si es un escaneo, las planillas se arman de cero con el horario."
         )
 
-    unmatched = [
-        match.id
-        for match in matches
-        if not match_pages[match.id]
-    ]
+    unmatched = [match.id for match in matches if not match_pages[match.id]]
     return AssignmentResult(
         pages=pages,
         match_pages=match_pages,

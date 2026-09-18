@@ -13,9 +13,17 @@ WHITE = (1, 1, 1)
 
 def stamp_page(page: fitz.Page, match: Match) -> None:
     fontname = _fontname(page)
-    for rect, value in _value_ops(page, ["Cancha:", "CANCHA:"], str(match.court)):
+    for rect, value in _value_ops(
+        page,
+        ["Cancha N°:", "Cancha N:", "Cancha N", "Cancha:", "CANCHA:"],
+        str(match.court),
+    ):
         _paint_value(page, rect, value, fontname)
-    for rect, value in _value_ops(page, ["Hora:", "Horario:", "HORA:"], match.time):
+    for rect, value in _value_ops(
+        page,
+        ["Horario:", "Hora:", "HORA:", "Horario"],
+        match.time,
+    ):
         _paint_value(page, rect, value, fontname)
 
     color = GREEN if match.category == "Hombres" else WINE
@@ -65,23 +73,33 @@ def _value_ops(page: fitz.Page, labels: list[str], value: str) -> list[tuple[fit
     if not hits:
         return []
     label_rect = sorted(hits, key=lambda item: (item.y0, item.x0))[0]
+    blanks: list[fitz.Rect] = []
+    for needle in ("________", "______", "_______"):
+        blanks.extend(page.search_for(needle))
     candidates = [
         rect
-        for rect in page.search_for("______")
+        for rect in blanks
         if rect.x0 >= label_rect.x0 - 6
-        and label_rect.y0 - 2 <= rect.y0 <= label_rect.y1 + 20
+        and abs(rect.y0 - label_rect.y0) <= 8
     ]
+    if not candidates:
+        candidates = [
+            rect
+            for rect in blanks
+            if rect.x0 >= label_rect.x0 - 6
+            and label_rect.y0 - 2 <= rect.y0 <= label_rect.y1 + 20
+        ]
     if candidates:
-        candidates.sort(key=lambda rect: (abs(rect.x0 - label_rect.x0), rect.y0))
-        target = candidates[0] + (-1, -1, 8, 2)
+        candidates.sort(key=lambda rect: (abs(rect.y0 - label_rect.y0), abs(rect.x0 - label_rect.x1)))
+        target = candidates[0] + (-1, -2, 18, 2)
         return [(target, value)]
     return [
         (
             fitz.Rect(
-                label_rect.x0,
-                label_rect.y1 + 1,
-                min(label_rect.x0 + 88, page.rect.width - 8),
-                label_rect.y1 + 16,
+                label_rect.x1 + 4,
+                label_rect.y0 - 1,
+                min(label_rect.x1 + 72, page.rect.width - 8),
+                label_rect.y1 + 2,
             ),
             value,
         )

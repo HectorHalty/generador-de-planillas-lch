@@ -1,23 +1,21 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import { NextResponse } from "next/server";
 
-import { buildSamplePdf, generatePdf } from "@/lib/run-processor";
+import { resolveUploadedPdf } from "@/lib/pdf-source";
+import { generatePdf } from "@/lib/run-processor";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const schedule = String(form.get("schedule") ?? "");
-    const useSample = String(form.get("sample") ?? "") === "1";
+    const source = String(form.get("source") ?? (form.get("sample") === "1" ? "ejemplo" : "masivo"));
     const sort = String(form.get("sort") ?? "category") === "court" ? "court" : "category";
     const includeIndex = String(form.get("index") ?? "1") !== "0";
     const createMissing = String(form.get("blanks") ?? "1") !== "0";
     const file = form.get("pdf");
-    const pdf = await resolvePdf(file, useSample, schedule);
+    const pdf = await resolveUploadedPdf(file, source, schedule);
     const result = await generatePdf({
       pdf,
       schedule,
@@ -38,21 +36,6 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "No pude armar el documento.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
-}
-
-async function resolvePdf(file: FormDataEntryValue | null, useSample: boolean, schedule: string) {
-  if (file instanceof File && file.size > 0) {
-    return Buffer.from(await file.arrayBuffer());
-  }
-  if (useSample) {
-    const samplePath = path.join(process.cwd(), "public", "planillas-ejemplo.pdf");
-    try {
-      return await readFile(samplePath);
-    } catch {
-      return buildSamplePdf(schedule);
-    }
-  }
-  throw new Error("Subí un PDF o usá la planilla de ejemplo.");
 }
 
 function compactSummary(summary: Record<string, unknown>) {

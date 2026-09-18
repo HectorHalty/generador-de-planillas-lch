@@ -24,10 +24,14 @@ Abrí [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
 ## Uso
 
-1. Subí `Planillas de Cancha - Masivo.pdf` o usá el ejemplo.
-2. Revisá o pegá el horario a la izquierda. También acepta un `.txt`.
-3. **Previsualizar** muestra qué hojas se quedan y qué equipos se van.
-4. **Armar planillas** descarga el PDF nuevo.
+El PDF **Planillas de Cancha - Masivo.pdf** ya puede ir precargado. Si lo querés cargar vos:
+
+1. Entrá a la app.
+2. En **1. Documento original**, hacé clic en el recuadro punteado (o arrastrá el archivo).
+3. En el explorador, andá a **Descargas** y elegí `Planillas de Cancha - Masivo.pdf`.
+4. Revisá el horario y tocá **Armar planillas**.
+
+Cada hoja del masivo es la planilla de un club. Planillero completa **Horario** y **Cancha N°**, ordena local y visitante según la jornada, y saca los equipos que no juegan (y la hoja extra de firmas, si la tenían).
 
 Opciones:
 

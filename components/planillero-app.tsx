@@ -32,7 +32,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [file, setFile] = useState<File | null>(null);
-  const [useSample, setUseSample] = useState(true);
+  const [source, setSource] = useState<"masivo" | "ejemplo" | "upload">("masivo");
   const [dragOver, setDragOver] = useState(false);
   const [sortMode, setSortMode] = useState<"category" | "court">("category");
   const [includeIndex, setIncludeIndex] = useState(true);
@@ -74,11 +74,17 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
   }, [downloadUrl]);
 
   const grouped = useMemo(() => groupMatches(parsed?.matches ?? []), [parsed]);
-  const sourceLabel = file ? file.name : useSample ? "Planilla de ejemplo" : "Sin documento";
+  const sourceLabel =
+    file?.name ??
+    (source === "masivo"
+      ? "Planillas de Cancha - Masivo.pdf"
+      : source === "ejemplo"
+        ? "Planilla de ejemplo"
+        : "Sin documento");
 
-  async function onPickFile(next: File | null) {
+  async function onPickFile(next: File | null, nextSource: "masivo" | "ejemplo" | "upload" = "upload") {
     setFile(next);
-    setUseSample(!next);
+    setSource(next ? "upload" : nextSource);
     setSummary(null);
     setError(null);
     if (downloadUrl) {
@@ -93,7 +99,7 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
     try {
       const form = new FormData();
       form.set("schedule", schedule);
-      form.set("sample", !file && useSample ? "1" : "0");
+      form.set("source", file ? "upload" : source);
       form.set("sort", sortMode);
       form.set("index", includeIndex ? "1" : "0");
       form.set("blanks", createMissing ? "1" : "0");
@@ -163,8 +169,10 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
             <CardHeader>
               <CardTitle>1. Documento original</CardTitle>
               <CardDescription>
-                Subí <span className="font-medium">Planillas de Cancha - Masivo.pdf</span> o
-                probá con el ejemplo, que incluye 3 partidos de más para ver cómo se eliminan.
+                Hacé clic en el recuadro o arrastrá el archivo. En tu compu suele estar en
+                Descargas, con el nombre{" "}
+                <span className="font-medium">Planillas de Cancha - Masivo.pdf</span>.
+                El que mandaste ya quedó cargado acá.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -193,25 +201,39 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                 <div>
                   <p className="font-medium">{sourceLabel}</p>
                   <p className="text-muted-foreground text-sm">
-                    PDF con las planillas. Arrastralo acá o elegilo del disco.
+                    {file
+                      ? "Listo. Si no es ese, hacé clic de nuevo y elegí otro PDF."
+                      : source === "masivo"
+                        ? "Ya está el masivo de esta jornada. Hacé clic solo si querés reemplazarlo."
+                        : "Clic acá → Elegí el PDF en Descargas → Abrir. También sirve arrastrarlo."}
                   </p>
                 </div>
               </button>
               <input
                 ref={inputRef}
                 type="file"
-                accept="application/pdf"
+                accept="application/pdf,.pdf"
                 className="hidden"
-                onChange={(event) => void onPickFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const next = event.target.files?.[0];
+                  if (next) void onPickFile(next);
+                }}
               />
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant={useSample && !file ? "default" : "outline"}
-                  onClick={() => void onPickFile(null)}
+                  variant={source === "masivo" && !file ? "default" : "outline"}
+                  onClick={() => void onPickFile(null, "masivo")}
                 >
                   <FileText data-icon="inline-start" />
-                  Usar ejemplo
+                  Usar el masivo
+                </Button>
+                <Button
+                  type="button"
+                  variant={source === "ejemplo" && !file ? "default" : "outline"}
+                  onClick={() => void onPickFile(null, "ejemplo")}
+                >
+                  Ejemplo de prueba
                 </Button>
                 <a className={cn(buttonVariants({ variant: "outline" }))} href="/api/sample">
                   Descargar ejemplo
