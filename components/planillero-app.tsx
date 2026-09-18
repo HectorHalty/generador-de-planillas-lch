@@ -18,8 +18,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { MatchInfo, ProcessSummary, SchedulePayload } from "@/lib/types";
 import { parseSchedule } from "@/lib/parse-schedule";
@@ -68,15 +66,23 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
         ? "Planilla de ejemplo"
         : "Sin documento");
 
-  async function onPickFile(next: File | null, nextSource: "masivo" | "ejemplo" | "upload" = "upload") {
+  function onPickFile(next: File | null, nextSource: "masivo" | "ejemplo" | "upload" = "upload") {
     setFile(next);
     setSource(next ? "upload" : nextSource);
     setSummary(null);
     setError(null);
+    if (!next && inputRef.current) inputRef.current.value = "";
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl);
       setDownloadUrl(null);
     }
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const kind = submitter?.value === "generate" ? "generate" : "analyze";
+    event.preventDefault();
+    void submit(kind);
   }
 
   async function submit(kind: "analyze" | "generate") {
@@ -95,14 +101,22 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
       if (file) form.set("pdf", file);
 
       if (kind === "analyze") {
-        const response = await fetch("/api/analyze", { method: "POST", body: form });
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          body: form,
+          headers: { Accept: "application/json" },
+        });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "No pude analizar el PDF.");
         setSummary(payload as ProcessSummary);
         return;
       }
 
-      const response = await fetch("/api/generate", { method: "POST", body: form });
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        body: form,
+        headers: { Accept: "application/pdf,application/json" },
+      });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
         throw new Error(payload.error || "No pude armar el PDF.");
@@ -136,8 +150,8 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
             </p>
             <h1 className="font-heading text-4xl leading-none sm:text-5xl">Planillero</h1>
             <p className="max-w-xl text-sm text-primary-foreground/80">
-              Cargá las planillas masivas y el horario por cancha. El documento nuevo queda
-              ordenado, con cancha y hora completas, y sin equipos que no juegan esta jornada.
+              El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
+              El documento nuevo queda ordenado, con cancha y hora, y sin equipos que no juegan.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -152,254 +166,319 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-6">
-          <Card className="bg-card/90">
-            <CardHeader>
-              <CardTitle>1. Documento original</CardTitle>
-              <CardDescription>
-                Hacé clic en el recuadro o arrastrá el archivo. En tu compu suele estar en
-                Descargas, con el nombre{" "}
-                <span className="font-medium">Planillas de Cancha - Masivo.pdf</span>.
-                El que mandaste ya quedó cargado acá.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragOver(false);
-                  const next = event.dataTransfer.files[0];
-                  if (next) void onPickFile(next);
-                }}
-                className={cn(
-                  "flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center transition-colors",
-                  dragOver
-                    ? "border-primary bg-secondary"
-                    : "border-border bg-[oklch(0.97_0.015_95)] hover:border-primary/50",
-                )}
+      <form
+        action="/api/generate"
+        method="post"
+        encType="multipart/form-data"
+        onSubmit={handleSubmit}
+      >
+        <input type="hidden" name="source" value={file ? "upload" : source} />
+        <input type="hidden" name="sort" value={sortMode} />
+        <input type="hidden" name="index" value={includeIndex ? "1" : "0"} />
+        <input type="hidden" name="blanks" value={createMissing ? "1" : "0"} />
+
+        <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2">
+            <SubmitAction
+              id="preview-planillas"
+              value="analyze"
+              formAction="/api/analyze"
+              variant="outline"
+              busy={busy === "analyze"}
+              disabled={busy !== null}
+              idleIcon={Users}
+              idleLabel="Previsualizar"
+              busyLabel="Leyendo el PDF…"
+            />
+            <SubmitAction
+              id="armar-planillas"
+              value="generate"
+              formAction="/api/generate"
+              busy={busy === "generate"}
+              disabled={busy !== null}
+              idleIcon={Download}
+              idleLabel="Armar planillas"
+              busyLabel="Armando el PDF…"
+            />
+            {downloadUrl ? (
+              <a
+                className={cn(buttonVariants({ variant: "secondary" }))}
+                href={downloadUrl}
+                download="planillas-cancha.pdf"
               >
-                <Upload className="size-6 text-primary" />
-                <div>
-                  <p className="font-medium">{sourceLabel}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {file
-                      ? "Listo. Si no es ese, hacé clic de nuevo y elegí otro PDF."
-                      : source === "masivo"
-                        ? "Ya está el masivo de esta jornada. Hacé clic solo si querés reemplazarlo."
-                        : "Clic acá → Elegí el PDF en Descargas → Abrir. También sirve arrastrarlo."}
-                  </p>
-                </div>
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                onChange={(event) => {
-                  const next = event.target.files?.[0];
-                  if (next) void onPickFile(next);
-                }}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={source === "masivo" && !file ? "default" : "outline"}
-                  onClick={() => void onPickFile(null, "masivo")}
-                >
-                  <FileText data-icon="inline-start" />
-                  Usar el masivo
-                </Button>
-                <Button
-                  type="button"
-                  variant={source === "ejemplo" && !file ? "default" : "outline"}
-                  onClick={() => void onPickFile(null, "ejemplo")}
-                >
-                  Ejemplo de prueba
-                </Button>
-                <a className={cn(buttonVariants({ variant: "outline" }))} href="/api/sample">
-                  Descargar ejemplo
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>2. Horario por cancha</CardTitle>
-              <CardDescription>
-                Pegá la lista o editá la jornada. Formato: categoría, cancha, y
-                <span className="font-mono"> hora: Local vs Visitante</span>.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                value={schedule}
-                onChange={(event) => setSchedule(event.target.value)}
-                className="min-h-[280px] font-mono text-xs leading-5"
-                aria-label="Horario de canchas"
-              />
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSchedule(defaultSchedule)}
-                >
-                  Restaurar jornada
-                </Button>
-                <label className="text-muted-foreground inline-flex cursor-pointer items-center gap-2 text-sm">
-                  Cargar .txt
-                  <input
-                    type="file"
-                    accept=".txt,.md,.csv"
-                    className="hidden"
-                    onChange={async (event) => {
-                      const next = event.target.files?.[0];
-                      if (!next) return;
-                      setSchedule(await next.text());
-                    }}
-                  />
-                </label>
-                {parseError ? (
-                  <p className="text-destructive text-sm">{parseError}</p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {parsed.matchCount
-                      ? `${parsed.matchCount} partidos listos`
-                      : "Leyendo horario…"}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>3. Cómo armar el PDF</CardTitle>
-              <CardDescription>
-                Se conservan las hojas de equipos que sí juegan, se completa cancha y hora, y
-                se tiran las que no están en el horario.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex items-start gap-2 rounded-lg border border-border p-3">
-                  <Checkbox
-                    checked={includeIndex}
-                    onCheckedChange={(value) => setIncludeIndex(value === true)}
-                  />
-                  <span>
-                    <span className="block font-medium">Hoja índice</span>
-                    <span className="text-muted-foreground text-sm">
-                      Un resumen al frente, agrupado por cancha y horario.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 rounded-lg border border-border p-3">
-                  <Checkbox
-                    checked={createMissing}
-                    onCheckedChange={(value) => setCreateMissing(value === true)}
-                  />
-                  <span>
-                    <span className="block font-medium">Completar faltantes</span>
-                    <span className="text-muted-foreground text-sm">
-                      Si un partido no está en el PDF, se crea una planilla en blanco.
-                    </span>
-                  </span>
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={sortMode === "category" ? "default" : "outline"}
-                  onClick={() => setSortMode("category")}
-                >
-                  Hombres, después mujeres
-                </Button>
-                <Button
-                  type="button"
-                  variant={sortMode === "court" ? "default" : "outline"}
-                  onClick={() => setSortMode("court")}
-                >
-                  Solo cancha y hora
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  id="preview-planillas"
-                  type="button"
-                  className={cn(buttonVariants({ variant: "outline", size: "lg" }), "min-h-11 px-4")}
-                  disabled={busy !== null}
-                  onClick={() => void submit("analyze")}
-                >
-                  {busy === "analyze" ? (
-                    <LoaderCircle className="animate-spin" data-icon="inline-start" />
-                  ) : (
-                    <Users data-icon="inline-start" />
-                  )}
-                  {busy === "analyze" ? "Leyendo el PDF…" : "Previsualizar"}
-                </button>
-                <button
-                  id="armar-planillas"
-                  type="button"
-                  className={cn(buttonVariants({ size: "lg" }), "min-h-11 px-4")}
-                  disabled={busy !== null}
-                  onClick={() => void submit("generate")}
-                >
-                  {busy === "generate" ? (
-                    <LoaderCircle className="animate-spin" data-icon="inline-start" />
-                  ) : (
-                    <Download data-icon="inline-start" />
-                  )}
-                  {busy === "generate" ? "Armando el PDF…" : "Armar planillas"}
-                </button>
-                {downloadUrl ? (
-                  <a
-                    className={cn(buttonVariants({ variant: "secondary" }))}
-                    href={downloadUrl}
-                    download="planillas-cancha.pdf"
-                  >
-                    Descargar de nuevo
-                  </a>
-                ) : null}
-              </div>
-              {busy ? (
-                <p className="rounded-lg bg-secondary px-3 py-2 text-sm">
-                  {busy === "analyze"
-                    ? "Estoy leyendo las planillas. Puede tardar unos segundos."
-                    : "Estoy armando el PDF nuevo. No cierres esta pestaña."}
-                </p>
-              ) : null}
-              {error ? (
-                <Alert variant="destructive">
-                  <AlertTriangle />
-                  <AlertTitle>No se pudo armar el documento</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              ) : null}
-              {summary ? <SummaryPanel summary={summary} /> : null}
-            </CardContent>
-          </Card>
+                Descargar de nuevo
+              </a>
+            ) : null}
+            {busy ? (
+              <p className="text-sm">
+                {busy === "analyze"
+                  ? "Estoy leyendo las planillas…"
+                  : "Estoy armando el PDF nuevo…"}
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                {parsed.matchCount} partidos · documento {sourceLabel}
+              </p>
+            )}
+          </div>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <Card>
-            <CardHeader>
-              <CardTitle>Jornada</CardTitle>
-              <CardDescription>Orden de impresión según el horario cargado.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {parsed.matches.length ? (
-                <ScrollArea className="h-[min(70vh,640px)] pr-3">
-                  <div className="space-y-5">
+        <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-6">
+            <Card className="bg-card/90">
+              <CardHeader>
+                <CardTitle>1. Cómo subir el PDF</CardTitle>
+                <CardDescription>
+                  El archivo que mandaste,{" "}
+                  <span className="font-medium">Planillas de Cancha - Masivo.pdf</span>, ya está
+                  en el servidor. Para reemplazarlo: Elegir archivo → Descargas → Abrir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <label
+                  htmlFor="pdf-file"
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragOver(false);
+                    const next = event.dataTransfer.files[0];
+                    if (next) onPickFile(next);
+                  }}
+                  className={cn(
+                    "flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center transition-colors",
+                    dragOver
+                      ? "border-primary bg-secondary"
+                      : "border-border bg-[oklch(0.97_0.015_95)] hover:border-primary/50",
+                  )}
+                >
+                  <Upload className="size-6 text-primary" />
+                  <div>
+                    <p className="font-medium">{sourceLabel}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {file
+                        ? "Listo. Si no es ese, elegí otro PDF abajo."
+                        : source === "masivo"
+                          ? "Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo."
+                          : "Clic acá o usá Elegir archivo. También sirve arrastrarlo."}
+                    </p>
+                  </div>
+                </label>
+                <input
+                  ref={inputRef}
+                  id="pdf-file"
+                  name="pdf"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
+                  onChange={(event) => {
+                    const next = event.target.files?.[0];
+                    if (next) onPickFile(next);
+                  }}
+                />
+                <ol className="text-muted-foreground list-decimal space-y-1 pl-5 text-sm">
+                  <li>Tocá <span className="font-medium text-foreground">Elegir archivo</span>.</li>
+                  <li>
+                    En el explorador andá a <span className="font-medium text-foreground">Descargas</span>.
+                  </li>
+                  <li>
+                    Elegí <span className="font-medium text-foreground">Planillas de Cancha - Masivo.pdf</span> y
+                    Abrir.
+                  </li>
+                  <li>Revisá el horario y tocá <span className="font-medium text-foreground">Armar planillas</span>.</li>
+                </ol>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={source === "masivo" && !file ? "default" : "outline"}
+                    onClick={() => onPickFile(null, "masivo")}
+                  >
+                    <FileText data-icon="inline-start" />
+                    Usar el masivo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={source === "ejemplo" && !file ? "default" : "outline"}
+                    onClick={() => onPickFile(null, "ejemplo")}
+                  >
+                    Ejemplo de prueba
+                  </Button>
+                  <a className={cn(buttonVariants({ variant: "outline" }))} href="/api/sample">
+                    Descargar ejemplo
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>2. Horario por cancha</CardTitle>
+                <CardDescription>
+                  Pegá la lista o editá la jornada. Formato: categoría, cancha, y
+                  <span className="font-mono"> hora: Local vs Visitante</span>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  name="schedule"
+                  value={schedule}
+                  onChange={(event) => setSchedule(event.target.value)}
+                  className="field-sizing-fixed h-64 resize-y overflow-auto font-mono text-xs leading-5"
+                  aria-label="Horario de canchas"
+                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSchedule(defaultSchedule)}
+                  >
+                    Restaurar jornada
+                  </Button>
+                  <label className="text-muted-foreground inline-flex cursor-pointer items-center gap-2 text-sm">
+                    Cargar .txt
+                    <input
+                      type="file"
+                      accept=".txt,.md,.csv"
+                      className="hidden"
+                      onChange={async (event) => {
+                        const next = event.target.files?.[0];
+                        if (!next) return;
+                        setSchedule(await next.text());
+                      }}
+                    />
+                  </label>
+                  {parseError ? (
+                    <p className="text-destructive text-sm">{parseError}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      {parsed.matchCount
+                        ? `${parsed.matchCount} partidos listos`
+                        : "Leyendo horario…"}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>3. Cómo armar el PDF</CardTitle>
+                <CardDescription>
+                  Se conservan las hojas de equipos que sí juegan, se completa cancha y hora, y
+                  se tiran las que no están en el horario.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-start gap-2 rounded-lg border border-border p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
+                      checked={includeIndex}
+                      onChange={(event) => setIncludeIndex(event.target.checked)}
+                    />
+                    <span>
+                      <span className="block font-medium">Hoja índice</span>
+                      <span className="text-muted-foreground text-sm">
+                        Un resumen al frente, agrupado por cancha y horario.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 rounded-lg border border-border p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[oklch(0.38_0.08_155)]"
+                      checked={createMissing}
+                      onChange={(event) => setCreateMissing(event.target.checked)}
+                    />
+                    <span>
+                      <span className="block font-medium">Completar faltantes</span>
+                      <span className="text-muted-foreground text-sm">
+                        Si un partido no está en el PDF, se crea una planilla en blanco.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={sortMode === "category" ? "default" : "outline"}
+                    onClick={() => setSortMode("category")}
+                  >
+                    Hombres, después mujeres
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={sortMode === "court" ? "default" : "outline"}
+                    onClick={() => setSortMode("court")}
+                  >
+                    Solo cancha y hora
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <SubmitAction
+                    id="preview-planillas-footer"
+                    value="analyze"
+                    formAction="/api/analyze"
+                    variant="outline"
+                    busy={busy === "analyze"}
+                    disabled={busy !== null}
+                    idleIcon={Users}
+                    idleLabel="Previsualizar"
+                    busyLabel="Leyendo el PDF…"
+                  />
+                  <SubmitAction
+                    id="armar-planillas-footer"
+                    value="generate"
+                    formAction="/api/generate"
+                    busy={busy === "generate"}
+                    disabled={busy !== null}
+                    idleIcon={Download}
+                    idleLabel="Armar planillas"
+                    busyLabel="Armando el PDF…"
+                  />
+                  {downloadUrl ? (
+                    <a
+                      className={cn(buttonVariants({ variant: "secondary" }))}
+                      href={downloadUrl}
+                      download="planillas-cancha.pdf"
+                    >
+                      Descargar de nuevo
+                    </a>
+                  ) : null}
+                </div>
+                {busy ? (
+                  <p className="rounded-lg bg-secondary px-3 py-2 text-sm">
+                    {busy === "analyze"
+                      ? "Estoy leyendo las planillas. Puede tardar unos segundos."
+                      : "Estoy armando el PDF nuevo. No cierres esta pestaña."}
+                  </p>
+                ) : null}
+                {error ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle />
+                    <AlertTitle>No se pudo armar el documento</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {summary ? <SummaryPanel summary={summary} /> : null}
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            <Card>
+              <CardHeader>
+                <CardTitle>Jornada</CardTitle>
+                <CardDescription>Orden de impresión según el horario cargado.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {parsed.matches.length ? (
+                  <div className="h-[min(70vh,640px)] space-y-5 overflow-auto pr-3">
                     {grouped.map((group) => (
                       <section key={`${group.category}-${group.court}`}>
                         <div className="mb-2 flex items-center justify-between gap-2">
@@ -429,17 +508,58 @@ export function PlanilleroApp({ defaultSchedule }: Props) {
                       </section>
                     ))}
                   </div>
-                </ScrollArea>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  Cuando el horario sea válido, los partidos aparecen acá agrupados por cancha.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
-      </main>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Cuando el horario sea válido, los partidos aparecen acá agrupados por cancha.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </aside>
+        </main>
+      </form>
     </div>
+  );
+}
+
+function SubmitAction({
+  id,
+  value,
+  formAction,
+  variant,
+  busy,
+  disabled,
+  idleIcon: IdleIcon,
+  idleLabel,
+  busyLabel,
+}: {
+  id: string;
+  value: "analyze" | "generate";
+  formAction: string;
+  variant?: "outline";
+  busy: boolean;
+  disabled: boolean;
+  idleIcon: typeof Users;
+  idleLabel: string;
+  busyLabel: string;
+}) {
+  return (
+    <button
+      id={id}
+      type="submit"
+      name="intent"
+      value={value}
+      formAction={formAction}
+      className={cn(buttonVariants({ variant, size: "lg" }), "min-h-11 px-4")}
+      disabled={disabled}
+    >
+      {busy ? (
+        <LoaderCircle className="animate-spin" data-icon="inline-start" />
+      ) : (
+        <IdleIcon data-icon="inline-start" />
+      )}
+      {busy ? busyLabel : idleLabel}
+    </button>
   );
 }
 

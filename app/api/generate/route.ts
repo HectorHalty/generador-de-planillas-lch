@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { htmlResponse, renderErrorPage, wantsHtml } from "@/lib/form-html";
 import { resolveUploadedPdf } from "@/lib/pdf-source";
 import { generatePdf } from "@/lib/run-processor";
 
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  const html = wantsHtml(request);
   try {
     const form = await request.formData();
     const schedule = String(form.get("schedule") ?? "");
@@ -29,11 +31,13 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="planillas-cancha.pdf"',
+        "Cache-Control": "no-store",
         "X-Planillero-Summary": encodeURIComponent(JSON.stringify(compact)),
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No pude armar el documento.";
+    if (html) return htmlResponse(renderErrorPage(message), 400);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

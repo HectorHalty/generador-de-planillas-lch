@@ -22,14 +22,17 @@ npm run dev -- --port 43147
 
 Abrí [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
-## Uso
+## Cómo subir el PDF
 
-El PDF **Planillas de Cancha - Masivo.pdf** ya puede ir precargado. Si lo querés cargar vos:
+El masivo de esta jornada ya viene precargado en la app. Si lo querés cargar vos (u otro archivo):
 
-1. Entrá a la app.
-2. En **1. Documento original**, hacé clic en el recuadro punteado (o arrastrá el archivo).
-3. En el explorador, andá a **Descargas** y elegí `Planillas de Cancha - Masivo.pdf`.
-4. Revisá el horario y tocá **Armar planillas**.
+1. Abrí Planillero.
+2. En **1. Cómo subir el PDF**, tocá **Elegir archivo** (o arrastrá el PDF al recuadro).
+3. En el explorador, andá a **Descargas**.
+4. Elegí `Planillas de Cancha - Masivo.pdf` y **Abrir**.
+5. Revisá el horario y tocá **Armar planillas**. El navegador descarga `planillas-cancha.pdf`.
+
+**Previsualizar** muestra qué equipos se tiran, sin generar el PDF todavía.
 
 Cada hoja del masivo es la planilla de un club. Planillero completa **Horario** y **Cancha N°**, ordena local y visitante según la jornada, y saca los equipos que no juegan (y la hoja extra de firmas, si la tenían).
 
