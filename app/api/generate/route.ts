@@ -25,12 +25,13 @@ export async function POST(request: Request) {
       includeIndex,
       createMissing,
     });
+    const compact = compactSummary(result.summary);
     const bytes = new Uint8Array(result.pdf);
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="planillas-cancha.pdf"',
-        "X-Planillero-Summary": encodeURIComponent(JSON.stringify(result.summary)),
+        "X-Planillero-Summary": encodeURIComponent(JSON.stringify(compact)),
       },
     });
   } catch (error) {
@@ -52,4 +53,27 @@ async function resolvePdf(file: FormDataEntryValue | null, useSample: boolean, s
     }
   }
   throw new Error("Subí un PDF o usá la planilla de ejemplo.");
+}
+
+function compactSummary(summary: Record<string, unknown>) {
+  const schedule = (summary.schedule ?? {}) as Record<string, unknown>;
+  return {
+    ok: summary.ok,
+    pageCount: summary.pageCount,
+    outputPages: summary.outputPages,
+    keptOriginalPages: summary.keptOriginalPages,
+    createdPlanillas: summary.createdPlanillas,
+    removedTeams: summary.removedTeams,
+    unmatchedMatches: summary.unmatchedMatches,
+    warnings: summary.warnings,
+    keptPages: summary.keptPages,
+    removedPages: summary.removedPages,
+    schedule: {
+      matchCount: schedule.matchCount ?? 0,
+      teamCount: schedule.teamCount ?? 0,
+      errors: schedule.errors ?? [],
+      matches: [],
+      teams: [],
+    },
+  };
 }

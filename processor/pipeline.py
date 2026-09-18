@@ -111,7 +111,6 @@ def _summary(parsed: ParseResult, assignment: AssignmentResult, page_count: int)
     return {
         "schedule": parsed.to_dict(),
         "pageCount": page_count,
-        "assignment": assignment.to_dict(),
         "removedPages": removed_pages,
         "removedTeams": assignment.removed_teams,
         "unmatchedMatches": unmatched,
