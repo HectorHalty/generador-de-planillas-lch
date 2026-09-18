@@ -15,7 +15,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Planillero — planillas de cancha",
+  title: "Generador de Planillas LCH",
   description:
     "Cargá el PDF masivo y el horario por cancha. El documento queda ordenado, con hora y cancha, y sin equipos de más.",
 };

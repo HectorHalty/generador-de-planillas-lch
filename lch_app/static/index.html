@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Generador de Planillas LCH</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --pitch: #2f4a38;
+        --paper: #f4efe2;
+        --card: #fffcf6;
+        --ink: #243328;
+        --muted: #5c6b5f;
+        --line: #e4dccb;
+        --danger: #7a2e24;
+        --danger-bg: #f8e4e0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      header {
+        background: var(--pitch);
+        color: #f7f3ea;
+        padding: 1.6rem 1.25rem;
+      }
+      .wrap { max-width: 72rem; margin: 0 auto; }
+      .kicker { margin: 0; letter-spacing: 0.28em; text-transform: uppercase; font-size: 0.72rem; opacity: 0.8; }
+      header h1 { font-family: Fraunces, Georgia, serif; margin: 0.35rem 0 0.4rem; font-size: 2.4rem; }
+      header p { margin: 0; max-width: 36rem; color: rgba(247,243,234,0.82); }
+      .stats { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+      .stat { background: rgba(255,255,255,0.08); border-radius: 0.9rem; padding: 0.7rem 1rem; min-width: 7rem; }
+      .stat span { display: block; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
+      .stat strong { font-family: Fraunces, Georgia, serif; font-size: 1.6rem; }
+      .bar {
+        position: sticky; top: 0; z-index: 5;
+        background: rgba(244,239,226,0.94);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        padding: 0.8rem 1.25rem;
+      }
+      .bar .wrap { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+      main { padding: 1.25rem; }
+      .grid { display: grid; gap: 1rem; grid-template-columns: minmax(0,1fr) 20rem; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 1.1rem 1.2rem;
+      }
+      h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+      .hint { color: var(--muted); font-size: 0.92rem; margin: 0 0 0.8rem; }
+      button, .btn {
+        font: inherit; cursor: pointer; border-radius: 0.7rem;
+        min-height: 2.6rem; padding: 0.4rem 0.95rem; border: 1px solid var(--line);
+        background: #fff; color: inherit; text-decoration: none; display: inline-flex;
+        align-items: center; gap: 0.4rem;
+      }
+      button.primary, .btn.primary { background: var(--pitch); color: #f7f3ea; border-color: transparent; }
+      button:disabled { opacity: 0.55; cursor: wait; }
+      textarea, input[type="date"], input[type="file"] { width: 100%; font: inherit; }
+      textarea {
+        min-height: 16rem; resize: vertical; border: 1px solid var(--line);
+        border-radius: 0.7rem; padding: 0.7rem; font-family: ui-monospace, monospace;
+        font-size: 0.78rem; line-height: 1.45; background: #fff;
+      }
+      .drop {
+        border: 1px dashed #c9c0aa; border-radius: 0.9rem; padding: 1.2rem;
+        text-align: center; background: #f7f3ea; margin-bottom: 0.7rem;
+      }
+      .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+      label.check { display: flex; gap: 0.6rem; align-items: flex-start; border: 1px solid var(--line); border-radius: 0.8rem; padding: 0.8rem; }
+      .side { max-height: min(70vh, 640px); overflow: auto; }
+      .match { border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.55rem 0.7rem; margin: 0.4rem 0; background: #fff; }
+      .time { color: var(--pitch); font-size: 0.78rem; font-weight: 600; }
+      .alert { border-radius: 0.8rem; padding: 0.8rem 0.9rem; margin-top: 0.8rem; }
+      .alert.bad { background: var(--danger-bg); color: var(--danger); }
+      .alert.ok { background: #eef3e6; }
+      .mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.6rem; }
+      .mini div { background: #eef3e6; border-radius: 0.6rem; padding: 0.55rem 0.65rem; }
+      .mini span { display: block; font-size: 0.75rem; color: var(--muted); }
+      ol { color: var(--muted); padding-left: 1.2rem; }
+      .group-title { display: flex; justify-content: space-between; margin: 0.8rem 0 0.3rem; font-family: Fraunces, Georgia, serif; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <p class="kicker">La Chacra Fútbol</p>
+        <h1>Generador de Planillas LCH</h1>
+        <p>El masivo ya está cargado. Completa día, cancha y hora, tira los equipos que no juegan, y no agrega las hojas de cruces ni la franja de margen.</p>
+        <div class="stats">
+          <div class="stat"><span>Partidos</span><strong id="stat-matches">—</strong></div>
+          <div class="stat"><span>Equipos</span><strong id="stat-teams">—</strong></div>
+          <div class="stat"><span>A borrar</span><strong id="stat-removed">—</strong></div>
+        </div>
+      </div>
+    </header>
+    <form id="form" action="/api/generate" method="post" enctype="multipart/form-data">
+      <div class="bar">
+        <div class="wrap">
+          <button id="preview" type="submit" formaction="/api/analyze" name="intent" value="analyze">Previsualizar</button>
+          <button id="armar" class="primary" type="submit" formaction="/api/generate" name="intent" value="generate">Armar planillas</button>
+          <a id="again" class="btn" href="#" download="planillas-cancha.pdf" hidden>Descargar de nuevo</a>
+          <span id="status" class="hint">Listo para armar</span>
+        </div>
+      </div>
+      <main class="wrap grid">
+        <div>
+          <section class="card">
+            <h2>1. Cómo subir el PDF</h2>
+            <p class="hint">El archivo <strong>Planillas de Cancha - Masivo.pdf</strong> ya está en el programa. Para usar otro, elegilo acá o arrastralo.</p>
+            <div class="drop" id="drop">
+              <strong id="source-label">Planillas de Cancha - Masivo.pdf</strong>
+              <p class="hint" id="source-hint">Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo.</p>
+            </div>
+            <input id="pdf-file" name="pdf" type="file" accept="application/pdf,.pdf" />
+            <ol>
+              <li>Tocá <strong>Elegir archivo</strong>.</li>
+              <li>Andá a <strong>Descargas</strong>.</li>
+              <li>Elegí <strong>Planillas de Cancha - Masivo.pdf</strong> y Abrir.</li>
+              <li>Tocá <strong>Armar planillas</strong>.</li>
+            </ol>
+            <div class="row">
+              <button type="button" id="use-masivo" class="primary">Usar el masivo</button>
+              <button type="button" id="use-ejemplo">Ejemplo de prueba</button>
+              <a class="btn" href="/api/sample">Descargar ejemplo</a>
+            </div>
+            <input type="hidden" name="source" id="source" value="masivo" />
+          </section>
+          <section class="card" style="margin-top:1rem">
+            <h2>2. Horario por cancha</h2>
+            <p class="hint">Formato: categoría, cancha, y <code>hora: Local vs Visitante</code>.</p>
+            <textarea name="schedule" id="schedule" aria-label="Horario de canchas">__SCHEDULE__</textarea>
+            <div class="row">
+              <button type="button" id="restore">Restaurar jornada</button>
+              <span class="hint" id="parse-status"></span>
+            </div>
+          </section>
+          <section class="card" style="margin-top:1rem">
+            <h2>3. Cómo armar el PDF</h2>
+            <p class="hint">Se completa el sábado, cancha y hora. No se agregan las hojas de cruces ni la franja de margen.</p>
+            <div class="row">
+              <label class="check" style="flex:1">
+                <span>
+                  <strong>Día de la jornada</strong><br />
+                  <input type="date" name="date" id="date" value="__DATE__" />
+                  <span class="hint">Por defecto el sábado próximo (__DATE_LABEL__).</span>
+                </span>
+              </label>
+              <label class="check" style="flex:1">
+                <input type="checkbox" id="blanks-ui" checked />
+                <span><strong>Completar faltantes</strong><br /><span class="hint">Crea una planilla en blanco si el partido no estaba en el PDF.</span></span>
+              </label>
+            </div>
+            <label class="check" style="margin-top:0.6rem">
+              <input type="checkbox" id="index-ui" />
+              <span><strong>Hojas de cruces al frente</strong><br /><span class="hint">Apagado: el PDF arranca en las planillas.</span></span>
+            </label>
+            <input type="hidden" name="index" id="index" value="0" />
+            <input type="hidden" name="blanks" id="blanks" value="1" />
+            <input type="hidden" name="sort" id="sort" value="category" />
+            <div class="row">
+              <button type="button" id="sort-cat" class="primary">Hombres, después mujeres</button>
+              <button type="button" id="sort-court">Solo cancha y hora</button>
+            </div>
+            <div id="error" class="alert bad" hidden></div>
+            <div id="summary" hidden></div>
+          </section>
+        </div>
+        <aside class="card">
+          <h2>Jornada</h2>
+          <p class="hint">Orden de impresión según el horario.</p>
+          <div class="side" id="jornada"></div>
+        </aside>
+      </main>
+    </form>
+    <script>
+      const defaultSchedule = document.getElementById("schedule").value;
+      const form = document.getElementById("form");
+      const scheduleEl = document.getElementById("schedule");
+      const sourceEl = document.getElementById("source");
+      const fileEl = document.getElementById("pdf-file");
+      let downloadUrl = null;
+
+      function parseSchedule(text) {
+        const matches = [];
+        let category = null, court = null, errors = [];
+        text.split(/\r?\n/).forEach((raw, i) => {
+          const line = raw.trim();
+          if (!line) return;
+          const cat = line.match(/^\s*[*#_]*\s*(hombres|mujeres|masculino|femenino|caballeros|damas)\s*:?\s*[*#_]*\s*$/i);
+          if (cat) { category = /mujer|femen|dama/i.test(cat[1]) ? "Mujeres" : "Hombres"; return; }
+          const c = line.match(/^\s*[*#_]*\s*cancha\s+(\d+)\s*:?\s*[*#_]*\s*$/i);
+          if (c) { court = Number(c[1]); return; }
+          const m = line.match(/^\s*[*#-]*\s*(\d{1,2}[:.]\d{2})\s*[:.\-–]\s*(.+?)\s+vs\.?\s+(.+?)\s*[*]*\s*$/i);
+          if (m) {
+            if (!category) errors.push("Falta categoría");
+            if (!court) errors.push("Falta cancha");
+            matches.push({ id: matches.length + 1, category: category || "Hombres", court: court || 1, time: m[1].replace(".", ":"), home: m[2].trim(), away: m[3].trim() });
+            return;
+          }
+          if (!/^\s*[-*#]/.test(line)) errors.push("Línea " + (i + 1) + ": no pude leer «" + line + "»");
+        });
+        const teams = [...new Set(matches.flatMap((x) => [x.home, x.away]))];
+        return { matches, errors, matchCount: matches.length, teamCount: teams.length };
+      }
+
+      function render() {
+        const parsed = parseSchedule(scheduleEl.value);
+        document.getElementById("stat-matches").textContent = parsed.matchCount || "—";
+        document.getElementById("stat-teams").textContent = parsed.teamCount || "—";
+        document.getElementById("parse-status").textContent = parsed.errors[0] || (parsed.matchCount + " partidos listos");
+        const box = document.getElementById("jornada");
+        box.innerHTML = "";
+        let last = "";
+        parsed.matches.forEach((match) => {
+          const key = match.category + "-" + match.court;
+          if (key !== last) {
+            last = key;
+            const count = parsed.matches.filter((x) => x.category === match.category && x.court === match.court).length;
+            const title = document.createElement("div");
+            title.className = "group-title";
+            title.innerHTML = "<span>" + match.category + " · Cancha " + match.court + "</span><span>" + count + "</span>";
+            box.appendChild(title);
+          }
+          const el = document.createElement("div");
+          el.className = "match";
+          el.innerHTML = "<div class='time'>" + match.time + "</div><div>" + match.home + " vs " + match.away + "</div>";
+          box.appendChild(el);
+        });
+      }
+
+      function setSource(source, file) {
+        sourceEl.value = file ? "upload" : source;
+        const label = document.getElementById("source-label");
+        const hint = document.getElementById("source-hint");
+        if (file) {
+          label.textContent = file.name;
+          hint.textContent = "Listo. Si no es ese, elegí otro PDF.";
+        } else if (source === "masivo") {
+          label.textContent = "Planillas de Cancha - Masivo.pdf";
+          hint.textContent = "Ya está el masivo de esta jornada. Solo subí otro si querés reemplazarlo.";
+        } else {
+          label.textContent = "Planilla de ejemplo";
+          hint.textContent = "Ejemplo de prueba, con equipos de más para ver el recorte.";
+        }
+        if (!file) fileEl.value = "";
+      }
+
+      scheduleEl.addEventListener("input", render);
+      fileEl.addEventListener("change", () => {
+        if (fileEl.files[0]) setSource("upload", fileEl.files[0]);
+      });
+      document.getElementById("use-masivo").onclick = () => setSource("masivo");
+      document.getElementById("use-ejemplo").onclick = () => setSource("ejemplo");
+      document.getElementById("restore").onclick = () => { scheduleEl.value = defaultSchedule; render(); };
+      document.getElementById("blanks-ui").onchange = (e) => { document.getElementById("blanks").value = e.target.checked ? "1" : "0"; };
+      document.getElementById("index-ui").onchange = (e) => { document.getElementById("index").value = e.target.checked ? "1" : "0"; };
+      document.getElementById("sort-cat").onclick = () => {
+        document.getElementById("sort").value = "category";
+        document.getElementById("sort-cat").classList.add("primary");
+        document.getElementById("sort-court").classList.remove("primary");
+      };
+      document.getElementById("sort-court").onclick = () => {
+        document.getElementById("sort").value = "court";
+        document.getElementById("sort-court").classList.add("primary");
+        document.getElementById("sort-cat").classList.remove("primary");
+      };
+
+      const drop = document.getElementById("drop");
+      drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.style.background = "#eef3e6"; });
+      drop.addEventListener("dragleave", () => { drop.style.background = "#f7f3ea"; });
+      drop.addEventListener("drop", (e) => {
+        e.preventDefault();
+        drop.style.background = "#f7f3ea";
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileEl.files = transfer.files;
+        setSource("upload", file);
+      });
+
+      form.addEventListener("submit", async (event) => {
+        const submitter = event.submitter;
+        const kind = submitter && submitter.value === "generate" ? "generate" : "analyze";
+        event.preventDefault();
+        const errorBox = document.getElementById("error");
+        errorBox.hidden = true;
+        document.getElementById("preview").disabled = true;
+        document.getElementById("armar").disabled = true;
+        document.getElementById("status").textContent = kind === "generate" ? "Armando el PDF…" : "Leyendo el PDF…";
+        try {
+          const body = new FormData(form);
+          if (kind === "analyze") {
+            const response = await fetch("/api/analyze", { method: "POST", body, headers: { Accept: "application/json" } });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || "No pude analizar el PDF.");
+            showSummary(payload);
+            return;
+          }
+          const response = await fetch("/api/generate", { method: "POST", body, headers: { Accept: "application/pdf,application/json" } });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({ error: "No pude armar el PDF." }));
+            throw new Error(payload.error || "No pude armar el PDF.");
+          }
+          const header = response.headers.get("X-Planillero-Summary");
+          if (header) showSummary(JSON.parse(decodeURIComponent(header)));
+          const blob = await response.blob();
+          if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+          downloadUrl = URL.createObjectURL(blob);
+          const again = document.getElementById("again");
+          again.href = downloadUrl;
+          again.hidden = false;
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = "planillas-cancha.pdf";
+          link.click();
+        } catch (err) {
+          errorBox.hidden = false;
+          errorBox.textContent = err.message || "Algo salió mal.";
+        } finally {
+          document.getElementById("preview").disabled = false;
+          document.getElementById("armar").disabled = false;
+          document.getElementById("status").textContent = "Listo para armar";
+        }
+      });
+
+      function showSummary(payload) {
+        document.getElementById("stat-removed").textContent = (payload.removedTeams || []).length;
+        const box = document.getElementById("summary");
+        box.hidden = false;
+        const removed = payload.removedTeams || [];
+        box.innerHTML =
+          '<div class="mini"><div><span>Hojas originales</span><strong>' + (payload.pageCount ?? "—") +
+          '</strong></div><div><span>Se conservan</span><strong>' + (payload.keptOriginalPages ?? (payload.keptPages || []).length) +
+          '</strong></div><div><span>PDF final</span><strong>' + (payload.outputPages ?? "—") +
+          '</strong></div></div>' +
+          (payload.matchDate ? '<p class="hint">Día completado: <strong>' + payload.matchDate + '</strong></p>' : '') +
+          (removed.length
+            ? '<div class="alert bad"><strong>Equipos fuera de la jornada</strong><div>' + removed.join(" · ") + "</div></div>"
+            : '<div class="alert ok"><strong>Nadie de más</strong><div>Todos los equipos del documento están en el horario.</div></div>');
+      }
+
+      render();
+    </script>
+  </body>
+</html>

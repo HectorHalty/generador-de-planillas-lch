@@ -151,9 +151,9 @@ export function PlanilleroApp({ defaultSchedule, defaultMatchDate }: Props) {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-medium tracking-[0.28em] uppercase text-[oklch(0.86_0.05_145)]">
-              Mesa de control
+              La Chacra Fútbol
             </p>
-            <h1 className="font-heading text-4xl leading-none sm:text-5xl">Planillero</h1>
+            <h1 className="font-heading text-4xl leading-none sm:text-5xl">Generador de Planillas LCH</h1>
             <p className="max-w-xl text-sm text-primary-foreground/80">
               El masivo de esta jornada ya está cargado. Si querés usar otro PDF, elegilo abajo.
               El documento nuevo queda ordenado, con cancha, hora y el sábado de la jornada,

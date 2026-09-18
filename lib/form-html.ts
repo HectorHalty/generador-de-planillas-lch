@@ -139,8 +139,8 @@ function shell({ title, body }: { title: string; body: string }) {
   </head>
   <body>
     <header>
-      <p>Mesa de control</p>
-      <h1>Planillero</h1>
+      <p>La Chacra Fútbol</p>
+      <h1>Generador de Planillas LCH</h1>
     </header>
     <main>${body}</main>
   </body>

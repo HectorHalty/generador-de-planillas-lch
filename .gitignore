@@ -43,4 +43,19 @@ next-env.d.ts
 __pycache__/
 .pytest_cache/
 .venv/
+.lch-venv/
+dist/
+build/
+agent-tools/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+__pycache__/
+.pytest_cache/
+.venv/
 agent-tools/

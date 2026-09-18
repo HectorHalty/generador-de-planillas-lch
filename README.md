@@ -1,45 +1,55 @@
-# Planillero
+# Generador de Planillas LCH
 
-App para armar las **planillas de cancha** de una jornada a partir de un PDF masivo y la lista de partidos por cancha y horario.
+Programa de **La Chacra Fútbol** para armar las planillas de cancha de una jornada.
 
-Hace tres cosas:
+A partir del PDF masivo y el horario por cancha:
 
-1. Lee el horario (Hombres/Mujeres, cancha, hora, local vs visitante).
-2. Conserva del PDF original las hojas cuyos equipos **sí están** en esa lista, y les completa día, cancha y hora.
-3. **Elimina** equipos que no juegan, ordena el documento por cancha y horario, y genera planillas nuevas si un partido no estaba en el PDF. No agrega las hojas de cruces ni la franja de margen.
+1. Completa **Día** (el sábado próximo), **Horario** y **Cancha N°**.
+2. Conserva las hojas de los equipos que **sí juegan**.
+3. Saca los que no están en el horario.
+4. **No** agrega las dos hojas de cruces ni la franja de margen.
 
-El horario de la jornada actual ya viene cargado. Si tu PDF original no está a mano, podés probar con la planilla de ejemplo (incluye 3 partidos de más para ver el recorte).
+El horario de la jornada actual ya viene cargado, y el masivo también si está en `public/`.
 
-## Cómo correrla
+## Cómo usarlo (doble clic)
 
-Necesitás Node 22+ y Python 3.12+ con:
+### Windows
+
+1. Instalá [Python 3.12+](https://www.python.org/downloads/). En el instalador **tildá “Add python.exe to PATH”**.
+2. Hacé **doble clic** en `Generador de Planillas LCH.bat` (también sirve `iniciar.bat`).
+3. La primera vez instala sola las librerías (un minuto). Después se abre el navegador.
+4. Tocá **Armar planillas**. Se descarga `planillas-cancha.pdf`.
+5. Dejá la ventana negra abierta mientras usás el programa. Cerrala para apagarlo.
+
+Si más adelante publicás este repo en GitHub, en **Actions** se puede bajar `GeneradorPlanillasLCH.exe` (un ejecutable de Windows, sin abrir el `.bat`).
+
+### macOS
+
+1. Instalá Python 3 desde [python.org](https://www.python.org/downloads/).
+2. Hacé doble clic en `Generador de Planillas LCH.command`. Si macOS lo bloquea: clic derecho → Abrir.
+
+### Linux
 
 ```bash
-python3 -m pip install -r processor/requirements.txt
-npm install
-npm run dev -- --port 43147
+chmod +x generador-de-planillas-lch.sh
+./generador-de-planillas-lch.sh
 ```
-
-Abrí [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
 ## Cómo subir el PDF
 
-El masivo de esta jornada ya viene precargado en la app. Si lo querés cargar vos (u otro archivo):
+El masivo de la jornada puede ir ya en `public/planillas-masivo.pdf`. Si querés cargar otro:
 
-1. Abrí Planillero.
-2. En **1. Cómo subir el PDF**, tocá **Elegir archivo** (o arrastrá el PDF al recuadro).
-3. En el explorador, andá a **Descargas**.
-4. Elegí `Planillas de Cancha - Masivo.pdf` y **Abrir**.
-5. Revisá el horario y tocá **Armar planillas**. El navegador descarga `planillas-cancha.pdf`.
+1. Entrá a la app.
+2. En **1. Cómo subir el PDF**, tocá **Elegir archivo** o arrastrá el PDF.
+3. Andá a **Descargas** y elegí `Planillas de Cancha - Masivo.pdf`.
+4. Revisá el horario y tocá **Armar planillas**.
 
 **Previsualizar** muestra qué equipos se tiran, sin generar el PDF todavía.
 
-Cada hoja del masivo es la planilla de un club. Planillero completa **Día** (el sábado próximo), **Horario** y **Cancha N°**, ordena local y visitante según la jornada, y saca los equipos que no juegan (y la hoja extra de firmas, si la tenían). El PDF arranca en las planillas: no incluye las dos hojas de cruces ni la franja de margen.
+## Opciones
 
-Opciones:
-
-- **Día de la jornada**: por defecto el sábado próximo (en Argentina).
-- **Hojas de cruces al frente**: apagado. Si lo marcás, agrega el índice de partidos.
+- **Día de la jornada**: por defecto el sábado próximo (Argentina).
+- **Hojas de cruces al frente**: apagado.
 - **Completar faltantes**: crea una planilla en blanco si el partido no estaba en el original.
 - **Hombres, después mujeres** o **solo cancha y hora**.
 
@@ -60,13 +70,56 @@ Cancha 1
 
 También acepta markdown (`**Hombres:**`, `*Cancha 1*`).
 
-## Motor en Python
+## Desarrollo
+
+Hace falta Python 3.12+. Node es opcional (solo si usás la interfaz Next.js).
 
 ```bash
-python3 -m processor.cli parse --schedule public/horario-jornada.txt
-python3 -m processor.cli analyze --pdf public/planillas-ejemplo.pdf --schedule public/horario-jornada.txt
-python3 -m processor.cli generate --pdf public/planillas-ejemplo.pdf --schedule public/horario-jornada.txt --out /tmp/planillas.pdf
+python3 -m pip install -r requirements.txt
+python3 lanzar.py
+```
+
+Pruebas:
+
+```bash
 python3 -m pytest tests -q
 ```
 
-Si el PDF es un escaneo sin texto, Planillero arma las planillas de cero con el horario.
+Motor en consola:
+
+```bash
+python3 -m processor.cli generate --pdf public/planillas-masivo.pdf --schedule public/horario-jornada.txt --out planillas-cancha.pdf --date 2026-09-19
+```
+
+Interfaz Next.js (opcional):
+
+```bash
+npm install
+npm run dev
+```
+
+### Ejecutable de Windows (desde GitHub)
+
+En un repo de GitHub, **Actions → Build Windows executable → Run workflow**. Baja `GeneradorPlanillasLCH.exe`. En una etiqueta `v1.0.0` también queda adjunto al Release.
+
+En tu máquina, con PyInstaller:
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+pyinstaller --noconfirm --clean packaging/generador.spec
+```
+
+## Publicar el repositorio público
+
+Este proyecto está pensado para un repo público llamado **generador-de-planillas-lch**.
+
+En Cursor, usá el botón **Create repo**, poné el nombre `generador-de-planillas-lch` y marcá **Public**. Después:
+
+```bash
+git remote add github https://github.com/TU_USUARIO/generador-de-planillas-lch.git
+git push -u github main
+```
+
+## Licencia
+
+MIT. Uso interno de mesa de control de La Chacra Fútbol.

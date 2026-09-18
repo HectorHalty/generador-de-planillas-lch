@@ -1,0 +1,7 @@
+pymupdf
+pypdf
+rapidfuzz
+fastapi
+uvicorn
+python-multipart
+httpx
