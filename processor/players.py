@@ -286,6 +286,8 @@ def _name_score(wanted: str, candidate: str) -> float:
 
 def _player_name_lines(page: fitz.Page) -> list[tuple[str, fitz.Rect]]:
     rows: list[tuple[str, fitz.Rect]] = []
+    header = page.search_for("NOMBRE DEL JUGADOR")
+    top = header[0].y1 if header else 138
     payload = page.get_text("dict")
     for block in payload.get("blocks", []):
         if block.get("type") != 0:
@@ -293,7 +295,7 @@ def _player_name_lines(page: fitz.Page) -> list[tuple[str, fitz.Rect]]:
         for line in block.get("lines", []):
             rect = fitz.Rect(line["bbox"])
             text = "".join(span.get("text", "") for span in line.get("spans", [])).strip()
-            if rect.x0 < 55 or rect.x0 > 90 or rect.y0 < 138:
+            if rect.x0 < 55 or rect.x0 > 90 or rect.y0 < top:
                 continue
             folded = normalize_name(text)
             if not folded or folded in HEADER_LABELS:

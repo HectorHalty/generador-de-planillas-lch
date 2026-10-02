@@ -23,6 +23,30 @@ def _roster_pdf(club: str, names: list[str]) -> bytes:
     return payload
 
 
+def _high_table_pdf(club: str, names: list[str]) -> bytes:
+    document = fitz.open()
+    page = document.new_page(width=595, height=842)
+    page.insert_text((40, 62), f"Liga: Hombres B  |  Club: {club}", fontsize=10)
+    page.insert_text((65.25, 117), "NOMBRE DEL JUGADOR", fontsize=8)
+    y = 137
+    for index, name in enumerate(names, start=1):
+        page.insert_text((42, y), str(index), fontsize=10)
+        page.insert_text((65.25, y), name, fontsize=10)
+        y += 19.1
+    payload = document.tobytes()
+    document.close()
+    return payload
+
+
+def test_marks_first_row_when_the_table_starts_higher():
+    document = fitz.open(stream=_high_table_pdf("Giraffe Soccer", ["Bruno Gazzola", "Daniel Rodriguez"]), filetype="pdf")
+    players, _ = parse_player_marks("Bruno Gazzola (Giraffe Soccer)")
+    marks = apply_player_marks(document, players)
+    assert marks[0].found is True
+    assert "Suspendido" in document[0].get_text("text")
+    document.close()
+
+
 def _has_marked_row(page: fitz.Page) -> bool:
     for drawing in page.get_drawings():
         fill = drawing.get("fill")
