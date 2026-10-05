@@ -2,3 +2,4 @@ pymupdf
 pypdf
 rapidfuzz
 pytest
+openpyxl

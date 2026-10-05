@@ -19,8 +19,7 @@ os.chdir(ROOT)
 VENV = ROOT / ".lch-venv"
 REQUIREMENTS = ROOT / "requirements.txt"
 PORT = int(os.environ.get("LCH_PORT", "43147"))
-HOST = os.environ.get("LCH_HOST", "0.0.0.0")
-URL = f"http://127.0.0.1:{PORT}"
+HOST = os.environ.get("LCH_HOST", "127.0.0.1")
 
 
 def main() -> int:
@@ -30,19 +29,25 @@ def main() -> int:
             return subprocess.call([str(python), str(ROOT / "lanzar.py"), *sys.argv[1:]])
         _ensure_imports()
 
+    port = _pick_port(PORT)
+    url = f"http://127.0.0.1:{port}"
     print()
     print("  Generador de Planillas LCH")
     print("  La Chacra Fútbol")
     print()
-    print(f"  Abriendo {URL}")
+    if port == PORT and _already_running(PORT):
+        print("  El programa ya estaba abierto. Lo abro en el navegador.")
+        _open_browser(url, delay=0)
+        return 0
+    print(f"  Abriendo {url}")
     print("  Dejá esta ventana abierta mientras usás la app.")
     print("  Cerrala para apagar el programa.")
     print()
 
-    threading.Thread(target=_open_browser, daemon=True).start()
+    threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
     from lch_app.server import run
 
-    run(host=HOST, port=PORT)
+    run(host=HOST, port=port)
     return 0
 
 
@@ -87,12 +92,35 @@ def _ensure_imports() -> None:
         ])
 
 
-def _open_browser() -> None:
-    time.sleep(1.2)
+def _already_running(port: int) -> bool:
+    import urllib.request
+
     try:
-        webbrowser.open(URL)
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1.5) as reply:
+            return reply.status == 200
     except Exception:
-        print(f"Abrí el navegador en {URL}")
+        return False
+
+
+def _pick_port(preferred: int) -> int:
+    """El puerto de siempre; si lo usa otro programa, el primero libre más arriba."""
+    import socket
+
+    if _already_running(preferred):
+        return preferred
+    for port in range(preferred, preferred + 50):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            if probe.connect_ex(("127.0.0.1", port)) != 0:
+                return port
+    return preferred
+
+
+def _open_browser(url: str, delay: float = 1.2) -> None:
+    time.sleep(delay)
+    try:
+        webbrowser.open(url)
+    except Exception:
+        print(f"Abrí el navegador en {url}")
 
 
 if __name__ == "__main__":

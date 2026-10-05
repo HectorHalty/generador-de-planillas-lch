@@ -33,3 +33,11 @@ def output_dir() -> Path:
 
 def output_pdf_path() -> Path:
     return output_dir() / "planillas-cancha.pdf"
+
+
+def alias_paths() -> list[Path]:
+    """alias-equipos.json del programa y, si existe, el que está junto al exe (pisa al primero)."""
+    paths = [public_dir() / "alias-equipos.json"]
+    if getattr(sys, "frozen", False):
+        paths.append(Path(sys.executable).resolve().parent / "alias-equipos.json")
+    return paths

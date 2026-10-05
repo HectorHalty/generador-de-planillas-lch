@@ -150,12 +150,11 @@
             <input type="hidden" name="source" id="source" value="masivo" />
           </section>
           <section class="card" style="margin-top:1rem">
-            <h2>2. Horario por cancha</h2>
-            <p class="hint">Formato: categoría, cancha, y <code>hora: Local vs Visitante</code>.</p>
-            <textarea name="schedule" id="schedule" aria-label="Horario de canchas">__SCHEDULE__</textarea>
+            <h2>2. Turnos y canchas</h2>
+            <p class="hint">Elegí el Excel <strong>TURNOS Y CANCHAS</strong>. Se usa la última fecha cargada en las hojas HOMBRES y MUJERES.</p>
+            <input id="turnos-file" name="turnos" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
             <div class="row">
-              <button type="button" id="restore">Restaurar jornada</button>
-              <span class="hint" id="parse-status"></span>
+              <span class="hint" id="parse-status">Todavía no elegiste el Excel.</span>
             </div>
           </section>
           <section class="card" style="margin-top:1rem">
@@ -196,51 +195,35 @@
       </main>
     </form>
     <script>
-      const defaultSchedule = document.getElementById("schedule").value;
       const form = document.getElementById("form");
-      const scheduleEl = document.getElementById("schedule");
+      const turnosEl = document.getElementById("turnos-file");
       const sourceEl = document.getElementById("source");
       const fileEl = document.getElementById("pdf-file");
       const playersEl = document.getElementById("players");
       const playerStatus = document.getElementById("player-status");
       const playerLine = /^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$/;
 
-      function parseSchedule(text) {
-        const matches = [];
-        let category = null, court = null, errors = [];
-        text.split(/\r?\n/).forEach((raw, i) => {
-          const line = raw.trim();
-          if (!line) return;
-          const cat = line.match(/^\s*[*#_]*\s*(hombres|mujeres|masculino|femenino|caballeros|damas)\s*:?\s*[*#_]*\s*$/i);
-          if (cat) { category = /mujer|femen|dama/i.test(cat[1]) ? "Mujeres" : "Hombres"; return; }
-          const c = line.match(/^\s*[*#_]*\s*cancha\s+(\d+)\s*:?\s*[*#_]*\s*$/i);
-          if (c) { court = Number(c[1]); return; }
-          const m = line.match(/^\s*[*#-]*\s*(\d{1,2}[:.]\d{2})\s*[:.\-–]\s*(.+?)\s+vs\.?\s+(.+?)\s*[*]*\s*$/i);
-          if (m) {
-            if (!category) errors.push("Falta categoría");
-            if (!court) errors.push("Falta cancha");
-            matches.push({ id: matches.length + 1, category: category || "Hombres", court: court || 1, time: m[1].replace(".", ":"), home: m[2].trim(), away: m[3].trim() });
-            return;
-          }
-          if (!/^\s*[-*#]/.test(line)) errors.push("Línea " + (i + 1) + ": no pude leer «" + line + "»");
-        });
-        const teams = [...new Set(matches.flatMap((x) => [x.home, x.away]))];
-        return { matches, errors, matchCount: matches.length, teamCount: teams.length };
+      function escapeHtml(text) {
+        return String(text).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
       }
 
-      function render() {
-        const parsed = parseSchedule(scheduleEl.value);
-        document.getElementById("stat-matches").textContent = parsed.matchCount || "—";
-        document.getElementById("stat-teams").textContent = parsed.teamCount || "—";
-        document.getElementById("parse-status").textContent = parsed.errors[0] || (parsed.matchCount + " partidos listos");
+      function renderJornada(schedule, turnos) {
+        const matches = (schedule && schedule.matches) || [];
+        document.getElementById("stat-matches").textContent = matches.length || "—";
+        document.getElementById("stat-teams").textContent = (schedule && schedule.teamCount) || "—";
+        const status = document.getElementById("parse-status");
+        if (turnos) {
+          const day = turnos.date ? " · " + turnos.date.split("-").reverse().join("/") : "";
+          status.textContent = "Fecha " + turnos.fecha + day + " · " + turnos.matchCount + " partidos listos";
+        }
         const box = document.getElementById("jornada");
         box.innerHTML = "";
         let last = "";
-        parsed.matches.forEach((match) => {
+        matches.forEach((match) => {
           const key = match.category + "-" + match.court;
           if (key !== last) {
             last = key;
-            const count = parsed.matches.filter((x) => x.category === match.category && x.court === match.court).length;
+            const count = matches.filter((x) => x.category === match.category && x.court === match.court).length;
             const title = document.createElement("div");
             title.className = "group-title";
             title.innerHTML = "<span>" + match.category + " · Cancha " + match.court + "</span><span>" + count + "</span>";
@@ -248,10 +231,9 @@
           }
           const el = document.createElement("div");
           el.className = "match";
-          el.innerHTML = "<div class='time'>" + match.time + "</div><div>" + match.home + " vs " + match.away + "</div>";
+          el.innerHTML = "<div class='time'>" + match.time + "</div><div>" + escapeHtml(match.home) + " vs " + escapeHtml(match.away) + "</div>";
           box.appendChild(el);
         });
-        renderPlayers();
       }
 
       function parsePlayers(text) {
@@ -305,12 +287,13 @@
         if (!file) fileEl.value = "";
       }
 
-      scheduleEl.addEventListener("input", render);
+      turnosEl.addEventListener("change", () => {
+        if (turnosEl.files[0]) run("analyze");
+      });
       fileEl.addEventListener("change", () => {
         if (fileEl.files[0]) setSource("upload", fileEl.files[0]);
       });
       document.getElementById("use-masivo").onclick = () => setSource("masivo");
-      document.getElementById("restore").onclick = () => { scheduleEl.value = defaultSchedule; render(); };
       document.getElementById("clear-players").onclick = () => { playersEl.value = ""; renderPlayers(); };
       playersEl.addEventListener("input", renderPlayers);
       document.getElementById("sort-cat").onclick = () => {
@@ -372,10 +355,10 @@
 
       function requestPayload() {
         const file = fileEl.files && fileEl.files[0];
+        const turnos = turnosEl.files && turnosEl.files[0];
         return {
-          file: file && file.size ? file : null,
+          files: { pdf: file && file.size ? file : null, turnos: turnos && turnos.size ? turnos : null },
           fields: {
-            schedule: scheduleEl.value,
             source: file && file.size ? "upload" : (sourceEl.value || "masivo"),
             sort: document.getElementById("sort").value,
             date: document.getElementById("date").value,
@@ -386,20 +369,14 @@
         };
       }
 
-      async function postOnce(url, fields, file) {
+      async function postOnce(url, fields, files) {
         const controller = new AbortController();
         const timer = setTimeout(function () { controller.abort(); }, 180000);
         try {
           const headers = { Accept: "application/json" };
-          let body;
-          if (file) {
-            body = new FormData();
-            Object.keys(fields).forEach(function (key) { body.set(key, fields[key]); });
-            body.set("pdf", file);
-          } else {
-            headers["Content-Type"] = "application/json";
-            body = JSON.stringify(fields);
-          }
+          const body = new FormData();
+          Object.keys(fields).forEach(function (key) { body.set(key, fields[key]); });
+          Object.keys(files).forEach(function (key) { if (files[key]) body.set(key, files[key]); });
           const response = await fetch(url, {
             method: "POST",
             body: body,
@@ -422,7 +399,7 @@
         const bases = apiBases();
         for (let i = 0; i < bases.length; i++) {
           try {
-            return await postOnce(bases[i] + path, req.fields, req.file);
+            return await postOnce(bases[i] + path, req.fields, req.files);
           } catch (err) {
             last = err;
             if (!isNetworkFailure(err)) throw err;
@@ -454,6 +431,7 @@
         document.getElementById("status").textContent = kind === "generate" ? "Armando el PDF… esperá unos segundos." : "Leyendo el PDF… esperá unos segundos.";
         try {
           const payload = await apiPost(kind === "analyze" ? "/api/analyze" : "/api/generate");
+          renderJornada(payload.schedule, payload.turnos);
           showSummary(payload);
           if (kind === "analyze") {
             document.getElementById("status").textContent = "Previsualización lista";
@@ -513,7 +491,6 @@
             : "");
       }
 
-      render();
       renderPlayers();
       pingHealth();
     </script>
