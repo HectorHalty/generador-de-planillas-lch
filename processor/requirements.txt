@@ -3,3 +3,4 @@ pypdf
 rapidfuzz
 pytest
 openpyxl
+tzdata

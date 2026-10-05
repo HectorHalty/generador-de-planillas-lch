@@ -3,6 +3,10 @@ from pathlib import Path
 
 root = Path(SPECPATH).resolve().parent
 
+from PyInstaller.utils.hooks import collect_data_files
+
+tzdata_files = collect_data_files("tzdata")
+
 a = Analysis(
     [str(root / "lanzar.py")],
     pathex=[str(root)],
@@ -11,6 +15,7 @@ a = Analysis(
         (str(root / "lch_app" / "static"), "lch_app/static"),
         (str(root / "public"), "public"),
         (str(root / "processor"), "processor"),
+        *tzdata_files,
     ],
     hiddenimports=[
         "uvicorn",
@@ -35,6 +40,7 @@ a = Analysis(
         "rapidfuzz",
         "pypdf",
         "openpyxl",
+        "tzdata",
         "lch_app",
         "lch_app.server",
         "lch_app.paths",
