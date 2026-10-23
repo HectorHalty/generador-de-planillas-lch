@@ -6,6 +6,8 @@ root = Path(SPECPATH).resolve().parent
 from PyInstaller.utils.hooks import collect_data_files
 
 tzdata_files = collect_data_files("tzdata")
+# pymupdf 1.26+ lee al importarse los modelos de pymupdf/layout/resources.
+pymupdf_files = collect_data_files("pymupdf")
 
 a = Analysis(
     [str(root / "lanzar.py")],
@@ -16,6 +18,7 @@ a = Analysis(
         (str(root / "public"), "public"),
         (str(root / "processor"), "processor"),
         *tzdata_files,
+        *pymupdf_files,
     ],
     hiddenimports=[
         "uvicorn",
