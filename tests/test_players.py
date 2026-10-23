@@ -38,6 +38,17 @@ def _high_table_pdf(club: str, names: list[str]) -> bytes:
     return payload
 
 
+def test_parse_player_marks_drops_dt_labels():
+    players, errors = parse_player_marks(
+        "Damian Gomory - DT (Real Mandril)\nJorge Bilbao (DT Atletico Bilbao)"
+    )
+    assert errors == []
+    assert [(p.name, p.team) for p in players] == [
+        ("Damian Gomory", "Real Mandril"),
+        ("Jorge Bilbao", "Atletico Bilbao"),
+    ]
+
+
 def test_marks_first_row_when_the_table_starts_higher():
     document = fitz.open(stream=_high_table_pdf("Giraffe Soccer", ["Bruno Gazzola", "Daniel Rodriguez"]), filetype="pdf")
     players, _ = parse_player_marks("Bruno Gazzola (Giraffe Soccer)")

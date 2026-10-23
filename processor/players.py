@@ -69,6 +69,8 @@ def parse_player_marks(text: str) -> tuple[list[MarkedPlayer], list[str]]:
             continue
         name = re.sub(r"\s+", " ", hit.group(1)).strip(" -")
         team = re.sub(r"\s+", " ", hit.group(2)).strip(" -")
+        name = re.sub(r"\s*[-–]\s*DT$", "", name, flags=re.IGNORECASE).strip()
+        team = re.sub(r"^DT\s+", "", team, flags=re.IGNORECASE).strip()
         if len(name) < 3 or len(team) < 2:
             errors.append(f"Línea {index}: faltan el nombre o el equipo.")
             continue
