@@ -644,7 +644,8 @@ function SummaryPanel({ summary }: { summary: ProcessSummary }) {
 function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
   if (!marks.length) return null;
   const found = marks.filter((item) => item.found);
-  const missing = marks.filter((item) => !item.found);
+  const resting = marks.filter((item) => item.status === "not_playing");
+  const missing = marks.filter((item) => !item.found && item.status !== "not_playing");
   return (
     <div className="space-y-2">
       {found.length ? (
@@ -666,6 +667,19 @@ function PlayerMarksPanel({ marks }: { marks: PlayerMark[] }) {
           <AlertTitle>Sin suspender</AlertTitle>
           <AlertDescription>
             {missing.map((item) => (
+              <span key={`${item.name}-${item.team}`} className="block">
+                Jugador: {item.name} · Equipo: {item.team}
+                {item.warning ? ` — ${item.warning}` : ""}
+              </span>
+            ))}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {resting.length ? (
+        <Alert>
+          <AlertTitle>Su equipo no juega esta fecha</AlertTitle>
+          <AlertDescription>
+            {resting.map((item) => (
               <span key={`${item.name}-${item.team}`} className="block">
                 Jugador: {item.name} · Equipo: {item.team}
               </span>

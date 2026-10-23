@@ -166,3 +166,87 @@ def test_real_masivo_player_marks_if_present():
     assert name_hits
     assert abs(hits[0].y0 - name_hits[0].y0) < 20
     output.close()
+
+
+def _two_club_pdf() -> bytes:
+    document = fitz.open()
+    for club, names in (
+        ("El Equipo del Banco", ["Martín Bertagno", "Bruno Arguello", "Bruno Lemma"]),
+        ("Salí de Ahí Maravilla F.C.", ["Pablo Ezequiel Ferreiro", "Bruno Lemma"]),
+        ("C.A.R.U.", ["Gerardo Aranciaga"]),
+    ):
+        page = fitz.open(stream=_roster_pdf(club, names), filetype="pdf")
+        document.insert_pdf(page)
+        page.close()
+    payload = document.tobytes()
+    document.close()
+    return payload
+
+
+def test_marks_players_when_team_is_written_short():
+    players, errors = parse_player_marks(
+        "Martin Bertagno (Banco)\n"
+        "Pablo Ezequiel Ferreiro (Sali de Ahi)\n"
+        "Gerardo Aranciaga (CARU)"
+    )
+    assert errors == []
+    document = fitz.open(stream=_two_club_pdf(), filetype="pdf")
+    marks = {item.name: item for item in apply_player_marks(document, players)}
+    assert marks["Martin Bertagno"].found is True
+    assert marks["Martin Bertagno"].page == 1
+    assert marks["Pablo Ezequiel Ferreiro"].page == 2
+    assert marks["Gerardo Aranciaga"].page == 3
+    document.close()
+
+
+def test_marks_player_by_name_when_team_is_unknown():
+    players, _ = parse_player_marks("Pablo Ezequiel Ferreiro (Los de Siempre)")
+    document = fitz.open(stream=_two_club_pdf(), filetype="pdf")
+    [mark] = apply_player_marks(document, players)
+    assert mark.found is True
+    assert mark.page == 2
+    document.close()
+
+
+def test_does_not_guess_when_name_is_in_two_teams():
+    players, _ = parse_player_marks("Bruno Lemma (Los de Siempre)\nBruno Arguello (Banco)")
+    document = fitz.open(stream=_two_club_pdf(), filetype="pdf")
+    marks = {item.name: item for item in apply_player_marks(document, players)}
+    assert marks["Bruno Arguello"].found is True
+    assert marks["Bruno Lemma"].found is False
+    assert marks["Bruno Lemma"].status == "team_missing"
+    document.close()
+
+
+def test_generate_says_when_team_does_not_play():
+    schedule = """
+Hombres:
+
+Cancha 1
+13:00: El Equipo del Banco vs Otro Equipo
+"""
+    players, _ = parse_player_marks("Martin Bertagno (Banco)\nGerardo Aranciaga (CARU)")
+    _, summary = generate_document(
+        _two_club_pdf(),
+        schedule,
+        ProcessOptions(match_date=date(2026, 9, 19), players=players),
+    )
+    marks = {item["name"]: item for item in summary["playerMarks"]}
+    assert marks["Martin Bertagno"]["found"] is True
+    assert marks["Gerardo Aranciaga"]["found"] is False
+    assert marks["Gerardo Aranciaga"]["status"] == "not_playing"
+    assert "C.A.R.U. no juega esta fecha" in marks["Gerardo Aranciaga"]["warning"]
+
+
+def test_analyze_says_when_team_does_not_play():
+    schedule = """
+Hombres:
+
+Cancha 1
+13:00: El Equipo del Banco vs Otro Equipo
+"""
+    players, _ = parse_player_marks("Martin Bertagno (Banco)\nGerardo Aranciaga (CARU)")
+    payload = analyze_document(_two_club_pdf(), schedule, players=players)
+    marks = {item["name"]: item for item in payload["playerMarks"]}
+    assert marks["Martin Bertagno"]["found"] is True
+    assert marks["Gerardo Aranciaga"]["status"] == "not_playing"

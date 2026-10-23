@@ -9,6 +9,7 @@ from rapidfuzz import fuzz
 from processor.assign import extract_club
 from processor.fonts import BOLD
 from processor.names import names_equivalent, normalize_name
+from processor.turnos_xlsx import MIN_SCORE, _score as team_score
 
 PLAYER_LINE = re.compile(r"^\s*(.+?)\s*\(\s*(.+?)\s*\)\s*$")
 LIST_PREFIX = re.compile(r"^[\-\*\u2022\u00b7\#]+\s*")
@@ -42,6 +43,8 @@ class PlayerMarkResult:
     found: bool
     page: int | None
     warning: str | None
+    # found | not_playing | team_missing | player_missing
+    status: str = "found"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -82,60 +85,79 @@ def apply_player_marks(
     players: list[MarkedPlayer],
     *,
     paint: bool = True,
+    all_clubs: list[str] | None = None,
 ) -> list[PlayerMarkResult]:
+    """all_clubs: los clubes del masivo completo, para avisar cuáles no juegan esta fecha."""
     if not players:
         return []
     clubs = _page_clubs(document)
-    results: list[PlayerMarkResult] = []
-    for player in players:
-        page_indexes = [
-            index
-            for index, club in enumerate(clubs)
-            if club and names_equivalent(club, player.team)
-        ]
-        if not page_indexes:
-            results.append(
-                PlayerMarkResult(
-                    name=player.name,
-                    team=player.team,
-                    found=False,
-                    page=None,
-                    warning=f"No encuentro la planilla de {player.team}.",
-                )
-            )
-            continue
-        marked = False
-        found_page = None
-        for index in page_indexes:
+    club_names = list(dict.fromkeys(club for club in clubs if club))
+    return [_mark_player(document, clubs, club_names, all_clubs, player, paint) for player in players]
+
+
+def _mark_player(
+    document: fitz.Document,
+    clubs: list[str | None],
+    club_names: list[str],
+    all_clubs: list[str] | None,
+    player: MarkedPlayer,
+    paint: bool,
+) -> PlayerMarkResult:
+    def result(status: str, page: int | None = None, warning: str | None = None) -> PlayerMarkResult:
+        return PlayerMarkResult(
+            name=player.name,
+            team=player.team,
+            found=status == "found",
+            page=page,
+            warning=warning,
+            status=status,
+        )
+
+    club = resolve_team(player.team, club_names)
+    if club:
+        for index, page_club in enumerate(clubs):
+            if page_club != club:
+                continue
             hit = _best_name_rect(document[index], player.name)
             if hit is None:
                 continue
             if paint:
                 _paint_row(document[index], hit)
-            marked = True
-            found_page = index + 1
-            break
-        if marked:
-            results.append(
-                PlayerMarkResult(
-                    name=player.name,
-                    team=player.team,
-                    found=True,
-                    page=found_page,
-                    warning=None,
-                )
-            )
-        else:
-            results.append(
-                PlayerMarkResult(
-                    name=player.name,
-                    team=player.team,
-                    found=False,
-                    page=None,
-                    warning=f"No encuentro a {player.name} en la planilla de {player.team}.",
-                )
-            )
-    return results
+            return result("found", index + 1)
+        return result(
+            "player_missing",
+            warning=f"No encuentro a {player.name} en la planilla de {club}.",
+        )
+
+    # El equipo no aparece: lo busco por nombre, solo si está en un único equipo.
+    hits: dict[str, tuple[int, fitz.Rect]] = {}
+    for index, page_club in enumerate(clubs):
+        rect = _best_name_rect(document[index], player.name, min_score=93)
+        if rect is not None and page_club and page_club not in hits:
+            hits[page_club] = (index, rect)
+    if len(hits) == 1:
+        index, rect = next(iter(hits.values()))
+        if paint:
+            _paint_row(document[index], rect)
+        return result("found", index + 1)
+
+    elsewhere = resolve_team(player.team, all_clubs or [])
+    if elsewhere:
+        return result("not_playing", warning=f"{elsewhere} no juega esta fecha.")
+    return result("team_missing", warning=f"No encuentro la planilla de {player.team}.")
+
+
+def resolve_team(team: str, club_names: list[str]) -> str | None:
+    """Nombre del club tal como figura en el masivo. Acepta abreviaturas (Banco, CARU, Sali de Ahi)."""
+    for club in club_names:
+        if names_equivalent(club, team):
+            return club
+    scored = sorted(((team_score(team, club), club) for club in club_names), key=lambda item: -item[0])
+    if not scored or scored[0][0] < MIN_SCORE:
+        return None
+    if len(scored) > 1 and scored[1][0] == scored[0][0]:
+        return None
+    return scored[0][1]
 
 
 def highlight_player_row(page: fitz.Page, player_name: str) -> bool:
@@ -217,6 +239,10 @@ def _write_suspendido(page: fitz.Page, row: fitz.Rect) -> None:
     )
 
 
+def page_clubs(document: fitz.Document) -> list[str]:
+    return list(dict.fromkeys(club for club in _page_clubs(document) if club))
+
+
 def _page_clubs(document: fitz.Document) -> list[str | None]:
     clubs: list[str | None] = []
     last: str | None = None
@@ -228,14 +254,14 @@ def _page_clubs(document: fitz.Document) -> list[str | None]:
     return clubs
 
 
-def _best_name_rect(page: fitz.Page, player_name: str) -> fitz.Rect | None:
+def _best_name_rect(page: fitz.Page, player_name: str, *, min_score: float = 88) -> fitz.Rect | None:
     wanted = normalize_name(player_name)
     if not wanted:
         return None
     best: tuple[float, fitz.Rect] | None = None
     for text, rect in _player_name_lines(page):
         score = _name_score(wanted, normalize_name(text))
-        if score < 88:
+        if score < min_score:
             continue
         if best is None or score > best[0]:
             best = (score, rect)

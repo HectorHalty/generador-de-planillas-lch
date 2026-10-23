@@ -9,7 +9,7 @@ import pymupdf as fitz
 from processor.assign import AssignmentResult, assign_pages
 from processor.dates import format_sheet_date, next_saturday
 from processor.planilla import draw_index_pages, draw_match_planilla
-from processor.players import MarkedPlayer, apply_player_marks
+from processor.players import MarkedPlayer, apply_player_marks, page_clubs
 from processor.schedule import Match, ParseResult, parse_schedule, sort_matches
 from processor.stamp import stamp_page
 
@@ -42,8 +42,11 @@ def analyze_document(
     payload["ok"] = True
     if players:
         document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        all_clubs = page_clubs(document)
+        document.select([page.index for page in assignment.pages if page.action == "keep"])
         payload["playerMarks"] = [
-            item.to_dict() for item in apply_player_marks(document, players, paint=False)
+            item.to_dict()
+            for item in apply_player_marks(document, players, paint=False, all_clubs=all_clubs)
         ]
         document.close()
         payload["warnings"] = list(payload.get("warnings") or []) + [
@@ -67,6 +70,7 @@ def generate_document(
     matches = sort_matches(parsed.matches, options.sort_mode)
     source = fitz.open(stream=pdf_bytes, filetype="pdf") if pdf_bytes else fitz.open()
     page_texts = [page.get_text("text") or "" for page in source]
+    source_clubs = page_clubs(source)
     assignment = assign_pages(page_texts, parsed.matches)
     day = format_sheet_date(options.match_date or next_saturday())
 
@@ -88,7 +92,7 @@ def generate_document(
             created_blank += 1
 
     source.close()
-    marks = apply_player_marks(output, options.players or [])
+    marks = apply_player_marks(output, options.players or [], all_clubs=source_clubs)
     pdf_out = output.tobytes()
     output.close()
 

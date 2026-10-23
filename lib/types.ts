@@ -54,4 +54,5 @@ export type PlayerMark = {
   found: boolean;
   page: number | null;
   warning: string | null;
+  status?: "found" | "not_playing" | "team_missing" | "player_missing";
 };

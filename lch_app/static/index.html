@@ -465,8 +465,9 @@
         const removed = payload.removedTeams || [];
         const marks = payload.playerMarks || [];
         const found = marks.filter((item) => item.found);
-        const missing = marks.filter((item) => !item.found);
-        const warnings = (payload.warnings || []).filter((item) => !missing.some((mark) => mark.warning === item));
+        const resting = marks.filter((item) => item.status === "not_playing");
+        const missing = marks.filter((item) => !item.found && item.status !== "not_playing");
+        const warnings = (payload.warnings || []).filter((item) => !marks.some((mark) => mark.warning === item));
         box.innerHTML =
           '<div class="mini"><div><span>Hojas originales</span><strong>' + (payload.pageCount ?? "—") +
           '</strong></div><div><span>Se conservan</span><strong>' + (payload.keptOriginalPages ?? (payload.keptPages || []).length) +
@@ -483,7 +484,12 @@
             : "") +
           (missing.length
             ? '<div class="alert bad"><strong>Sin suspender</strong><div>' +
-              missing.map((item) => "Jugador: " + item.name + " · Equipo: " + item.team).join("<br />") +
+              missing.map((item) => "Jugador: " + item.name + " · Equipo: " + item.team + (item.warning ? " — " + item.warning : "")).join("<br />") +
+              "</div></div>"
+            : "") +
+          (resting.length
+            ? '<div class="alert ok"><strong>Su equipo no juega esta fecha</strong><div>' +
+              resting.map((item) => "Jugador: " + item.name + " · Equipo: " + item.team).join("<br />") +
               "</div></div>"
             : "") +
           (warnings.length
